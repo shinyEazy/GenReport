@@ -590,15 +590,17 @@ FOR DIRECT TEXT RESPONSES (chat reply):
 
 FOR REPORT FILES (.md, .html, etc.):
 - You MAY and SHOULD embed generated charts/visualizations using markdown image syntax
-- Use the short proxy URL format provided by the system: ![Description](/api/v1/files/proxy-object?path=generated/...)
+- Use the exact URL/snippet provided by the system for each generated file. Do not invent, verify, or rewrite image paths.
 - After generating a chart with plt.savefig(), the system will provide a filename, a short description hint, and a proxy URL
+- If a tool result includes an "Embed in report" snippet, copy that snippet exactly. It is already valid for this runtime.
+- Do NOT regenerate charts only because an embed URL differs from an example. Local mode may use `/api/v1/files/content?...`; hosted mode may use `/api/v1/files/proxy-object?...`. Both are valid when provided by the tool result.
 - Include these images in your markdown report to make it visually rich
 - Prefer referencing images inline near the text that discusses them, for example:
 - Use centered 80% width HTML image blocks in markdown reports, not full-width raw markdown images:
-  <p align="center"><img src="/api/v1/files/proxy-object?path=generated/..." alt="confusion matrix" width="80%"></p>
+  <p align="center"><img src="COPY_THE_PROVIDED_URL_HERE" alt="confusion matrix" width="80%"></p>
 - Put the centered image block directly below the sentence that discusses it, for example:
   Confusion matrix is shown below:
-  <p align="center"><img src="/api/v1/files/proxy-object?path=generated/..." alt="confusion matrix" width="80%"></p>
+  <p align="center"><img src="COPY_THE_PROVIDED_URL_HERE" alt="confusion matrix" width="80%"></p>
 - This makes the report self-contained and viewable with all visuals included
 - DO NOT dump all images into one generic "visualizations" section; reference each image where it supports the discussion
 
@@ -627,7 +629,7 @@ Example report structure:
 
 ## [Finding stated as a sentence]
 Short interpretation of the evidence.
-<p align="center"><img src="/api/v1/files/proxy-object?path=generated/..." alt="chart description" width="80%"></p>
+<p align="center"><img src="COPY_THE_PROVIDED_URL_HERE" alt="chart description" width="80%"></p>
 
 ## [Second finding stated as a sentence]
 Short interpretation, with table or chart if useful.
@@ -913,7 +915,8 @@ When you receive an error from tool execution:
                             tool_content += (
                                 f"\n- [{filename}] ({file_type})"
                                 f"\n  Description hint: {description}"
-                                f"\n  Embed in report: <p align=\"center\"><img src=\"{proxy_url}\" alt=\"{description}\" width=\"80%\"></p>"
+                                f"\n  Embed in report exactly as-is: <p align=\"center\"><img src=\"{proxy_url}\" alt=\"{description}\" width=\"80%\"></p>"
+                                "\n  Status: already saved and registered; do not regenerate this chart to fix its path."
                             )
                 
                 if not tool_content:

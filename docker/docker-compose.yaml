@@ -1,0 +1,20 @@
+services:
+  genreport:
+    image: ghcr.io/astral-sh/uv:python3.11-bookworm-slim
+    working_dir: /workspace/GenReport/backend
+    volumes:
+      - ../:/workspace/GenReport
+      - uv-cache:/root/.cache/uv
+    ports:
+      - "8011:8011"
+    environment:
+      UV_SYSTEM_PYTHON: "1"
+      UV_LINK_MODE: copy
+      PYTHONDONTWRITEBYTECODE: "1"
+    command:
+      - /bin/sh
+      - -lc
+      - uv pip install -r requirements.txt && uvicorn main:app --host 0.0.0.0 --port 8011 --reload --reload-dir app --reload-exclude '*.pyc' --reload-exclude '__pycache__/*'
+
+volumes:
+  uv-cache:
