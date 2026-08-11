@@ -85,6 +85,7 @@ class ChatRequest(BaseModel):
     files: Optional[List[int]] = None  # List of uploaded file IDs
     analysis_mode: Optional[str] = None
     language: Optional[str] = None
+    runtime_gateway: Optional[Dict[str, Any]] = None
 
 
 class ChatStreamResponse(BaseModel):

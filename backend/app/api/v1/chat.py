@@ -19,11 +19,13 @@ from app.models.schemas import ChatRequest
 from app.services.llm_service import LLMService
 from app.services.agent_service import AgentService
 from app.services.sandbox_file_manager import SANDBOX_SKILLS_DIR, SANDBOX_WORK_DIR
+from app.services.runtime_gateway_client import RuntimeGatewayClient
 from app.api.v1.files import extract_oss_object_name
 
 router = APIRouter()
 llm_service = LLMService()
 agent_service = AgentService()
+runtime_gateway_client = RuntimeGatewayClient()
 
 
 AUTONOMOUS_EXPLORATION_PROMPT = """Run AUTONOMOUS EXPLORATION MODE on the uploaded dataset.
@@ -97,7 +99,10 @@ def normalize_generated_file(file_info: dict) -> dict:
     """Normalize generated file metadata to stable proxy URLs for frontend/report usage."""
     filename = file_info.get("filename") or file_info.get("name") or "unnamed"
     source_url = file_info.get("oss_url") or file_info.get("url") or ""
-    proxy_url = build_proxy_object_url_from_file_path(source_url, absolute=False) if source_url else ""
+    if file_info.get("purpose") == "run_artifact":
+        proxy_url = source_url
+    else:
+        proxy_url = build_proxy_object_url_from_file_path(source_url, absolute=False) if source_url else ""
 
     normalized = dict(file_info)
     normalized["filename"] = filename
@@ -125,6 +130,99 @@ def dedupe_generated_files(files: list[dict]) -> list[dict]:
         seen.add(key)
         deduped.append(normalized)
     return deduped
+
+
+def _resolved_generated_file_path(
+    tool_name: str,
+    tool_args: dict,
+    result: dict,
+) -> str | None:
+    if tool_name != "write_file" or not result.get("success"):
+        return None
+    resolved_path = result.get("path") or tool_args.get("path")
+    return resolved_path if isinstance(resolved_path, str) and resolved_path else None
+
+
+async def publish_runtime_artifacts(
+    runtime_gateway: dict | None,
+    files: list[dict],
+    published: dict[str, dict],
+) -> list[dict]:
+    pending = []
+    output = []
+    for file_info in files:
+        key = (
+            file_info.get("object_key")
+            or file_info.get("artifact_id")
+            or file_info.get("url")
+            or file_info.get("oss_url")
+            or file_info.get("filename")
+        )
+        if isinstance(key, str) and key in published:
+            output.append(published[key])
+            continue
+        pending.append(file_info)
+        output.append(file_info)
+    try:
+        mirrored = await runtime_gateway_client.mirror_artifact_refs(runtime_gateway, pending)
+    except Exception as exc:
+        print(f"Runtime artifact publish failed: {exc}")
+        return output
+    if not mirrored:
+        return output
+    mirrored_by_name = {
+        item.get("filename") or item.get("name"): item
+        for item in mirrored
+        if item.get("filename") or item.get("name")
+    }
+    replaced = []
+    for file_info in output:
+        name = file_info.get("filename") or file_info.get("name")
+        replacement = mirrored_by_name.get(name) if isinstance(name, str) else None
+        if not replacement:
+            replaced.append(file_info)
+            continue
+        old_key = (
+            file_info.get("object_key")
+            or file_info.get("artifact_id")
+            or file_info.get("url")
+            or file_info.get("oss_url")
+            or name
+        )
+        if isinstance(old_key, str):
+            published[old_key] = replacement
+        replaced.append(replacement)
+    return replaced
+
+
+async def publish_runtime_event(
+    runtime_gateway: dict | None,
+    event_type: str,
+    payload: dict,
+    *,
+    status: str = "completed",
+) -> None:
+    try:
+        await runtime_gateway_client.record_event(
+            runtime_gateway,
+            event_type,
+            payload,
+            status=status,
+        )
+    except Exception as exc:
+        print(f"Runtime event publish failed: {exc}")
+
+
+def runtime_tool_result_payload(tool_name: str, step: int, result: dict) -> dict:
+    return {
+        "tool_name": tool_name,
+        "step": step,
+        "success": result.get("success"),
+        "error": result.get("error"),
+        "exit_code": result.get("exit_code"),
+        "generated_files": result.get("generated_files") or [],
+        "output_preview": str(result.get("output") or result.get("stdout") or "")[:2000],
+    }
 
 
 def estimate_token_count(text: str) -> int:
@@ -697,6 +795,7 @@ When you receive an error from tool execution:
         all_tool_results = []  # Accumulate all tool results
         usage_events = []
         usage_request_id = str(uuid.uuid4())
+        runtime_published_artifacts: dict[str, dict] = {}
         
         # Set file/session context for agent. The actual sandbox container is
         # user-scoped so each user has at most one active OpenSandbox container.
@@ -837,6 +936,16 @@ When you receive an error from tool execution:
                 
                 # Send a visible status before long-running tool execution.
                 yield f"data: {json.dumps({'type': 'status', 'content': f'Executing {tool_name}...'})}\n\n"
+                await publish_runtime_event(
+                    request.runtime_gateway,
+                    "tool.started",
+                    {
+                        "tool_name": tool_name,
+                        "tool_call_id": tc.get("id"),
+                        "step": step,
+                    },
+                    status="running",
+                )
                 
                 # Execute tool with timeout and periodic keepalive
                 # For potentially long operations, we need to keep the connection alive
@@ -857,36 +966,35 @@ When you receive an error from tool execution:
                     result = tool_task.result()
                 
                 # For write_file, scan and register the newly created file
-                if tool_name == "write_file" and result.get("success"):
-                    file_path = tool_args.get("path", "")
-                    if file_path:
-                        filename = file_path.split("/")[-1]
-                        oss_url = await agent_service.file_manager.upload_generated_file(
-                            str(conversation_id),
-                            file_path,
-                            filename,
-                            user.id,
-                            db,
-                            sandbox_session_id=sandbox_session_id,
-                        )
-                        if oss_url:
-                            if "generated_files" not in result:
-                                result["generated_files"] = []
-                            # Determine file type
-                            ext = '.' + filename.split('.')[-1].lower() if '.' in filename else ''
-                            file_type = 'file'
-                            if ext in ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp']:
-                                file_type = 'image'
-                            elif ext in ['.pdf']:
-                                file_type = 'pdf'
-                            elif ext in ['.csv', '.xlsx', '.xls', '.json', '.txt', '.html', '.xml', '.md']:
-                                file_type = 'data'
-                            result["generated_files"].append({
-                                "filename": filename,
-                                "sandbox_path": file_path,
-                                "oss_url": oss_url,
-                                "type": file_type
-                            })
+                file_path = _resolved_generated_file_path(tool_name, tool_args, result)
+                if file_path:
+                    filename = file_path.split("/")[-1]
+                    oss_url = await agent_service.file_manager.upload_generated_file(
+                        str(conversation_id),
+                        file_path,
+                        filename,
+                        user.id,
+                        db,
+                        sandbox_session_id=sandbox_session_id,
+                    )
+                    if oss_url:
+                        if "generated_files" not in result:
+                            result["generated_files"] = []
+                        # Determine file type
+                        ext = '.' + filename.split('.')[-1].lower() if '.' in filename else ''
+                        file_type = 'file'
+                        if ext in ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp']:
+                            file_type = 'image'
+                        elif ext in ['.pdf']:
+                            file_type = 'pdf'
+                        elif ext in ['.csv', '.xlsx', '.xls', '.json', '.txt', '.html', '.xml', '.md']:
+                            file_type = 'data'
+                        result["generated_files"].append({
+                            "filename": filename,
+                            "sandbox_path": file_path,
+                            "oss_url": oss_url,
+                            "type": file_type
+                        })
                 
                 all_tool_results.append({
                     "tool_call": tc,
@@ -905,6 +1013,11 @@ When you receive an error from tool execution:
                 # Include generated file URLs (especially images) so model can reference them in reports
                 if result.get("generated_files"):
                     result["generated_files"] = dedupe_generated_files(result["generated_files"])
+                    result["generated_files"] = await publish_runtime_artifacts(
+                        request.runtime_gateway,
+                        result["generated_files"],
+                        runtime_published_artifacts,
+                    )
                     tool_content += "\n\n[Generated Files]"
                     for gf in result["generated_files"]:
                         if gf.get("url"):
@@ -928,6 +1041,12 @@ When you receive an error from tool execution:
                     "name": tool_name,
                     "content": tool_content
                 })
+                await publish_runtime_event(
+                    request.runtime_gateway,
+                    "tool.completed",
+                    runtime_tool_result_payload(tool_name, step, result),
+                    status="completed" if result.get("success", True) else "failed",
+                )
                 
                 yield f"data: {json.dumps({'type': 'tool_result', 'tool_call_id': tc['id'], 'tool_name': tool_name, 'result': result, 'step': step})}\n\n"
             
