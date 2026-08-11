@@ -76,7 +76,8 @@ class LLMService:
     async def stream_chat(
         self,
         messages: List[Dict[str, Any]],
-        model: str = None
+        model: str = None,
+        tool_definitions: List[Dict[str, Any]] | None = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream chat completion with tool support.
         Uses model default temperature and max_tokens."""
@@ -317,6 +318,8 @@ class LLMService:
                     }
                 }
             ]
+            if tool_definitions is not None:
+                tools = tool_definitions
             
             create_kwargs = {
                 "model": provider_model,

@@ -7,6 +7,8 @@ services:
       - uv-cache:/root/.cache/uv
     ports:
       - "8011:8011"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       UV_SYSTEM_PYTHON: "1"
       UV_LINK_MODE: copy

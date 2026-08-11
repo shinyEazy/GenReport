@@ -20,6 +20,8 @@ from app.services.llm_service import LLMService
 from app.services.agent_service import AgentService
 from app.services.sandbox_file_manager import SANDBOX_SKILLS_DIR, SANDBOX_WORK_DIR
 from app.services.runtime_gateway_client import RuntimeGatewayClient
+from app.services.axiom_execution_client import AxiomExecutionClient
+from app.services.axiom_tool_executor import AxiomToolExecutor
 from app.api.v1.files import extract_oss_object_name
 
 router = APIRouter()
@@ -351,6 +353,10 @@ async def stream_chat_response(
     db: Session
 ) -> AsyncGenerator[str, None]:
     """Stream chat response with multi-step tool execution (ReAct pattern)."""
+    if request.execution_context is None:
+        raise ValueError("execution_context is required for report generation")
+
+    axiom_executor = None
     try:
         # Get or create conversation
         conversation_id = None
@@ -379,11 +385,22 @@ async def stream_chat_response(
             db.refresh(conversation)
             conversation_id = conversation.id
             yield f"data: {json.dumps({'type': 'conversation_created', 'conversation_id': encode_id(conversation_id)})}\n\n"
+
+        use_axiom_execution = request.execution_context is not None
+        if use_axiom_execution:
+            axiom_executor = AxiomToolExecutor(
+                client=AxiomExecutionClient(request.execution_context),
+                files=request.execution_files,
+                input_path=request.execution_context.input_path,
+                work_path=request.execution_context.work_path,
+                output_path=request.execution_context.output_path,
+            )
+            await axiom_executor.materialize_assets()
         
         # Read uploaded files if any
         file_contents = []
         uploaded_files_list = []
-        if request.files:
+        if request.files and not use_axiom_execution:
             from app.models.models import UploadedFile
             for file_id in request.files:
                 uploaded_file = db.query(UploadedFile).filter(
@@ -417,6 +434,11 @@ async def stream_chat_response(
         if uploaded_files_list:
             file_names = ", ".join([f.original_name for f in uploaded_files_list])
             user_message_content += f"\n\n📎 **Attached {len(uploaded_files_list)} file(s):** {file_names}"
+        elif use_axiom_execution and request.execution_files:
+            file_names = ", ".join(item.filename for item in request.execution_files)
+            user_message_content += (
+                f"\n\n📎 **Attached {len(request.execution_files)} file(s):** {file_names}"
+            )
         
         # Build LLM message with file contents for analysis
         llm_message_content = AUTONOMOUS_EXPLORATION_PROMPT if autonomous_mode else request.message
@@ -435,56 +457,64 @@ async def stream_chat_response(
         db.commit()
         db.refresh(user_message)
         
-        # Sync uploaded files to sandbox with keepalive. This must happen
-        # before building the system prompt so the model sees real file paths.
-        if request.files:
-            sync_status = "正在同步数据..." if (request.language or "").lower().startswith("zh") else "Syncing data..."
-            yield f"data: {json.dumps({'type': 'status', 'content': sync_status})}\n\n"
-
         synced_files = []
-        sync_error = None
-
         sandbox_session_id = f"user-{user.id}"
         session_id_str = str(conversation_id)
-        should_sync_files = bool(request.files) or not agent_service.is_session_sync_current(
-            session_id_str,
-            sandbox_session_id,
-        )
-
-        async def do_sync():
-            nonlocal synced_files, sync_error
-            try:
-                synced_files = await agent_service.sync_files_for_session(
-                    session_id_str,
-                    db,
-                    user.id,
-                    sandbox_session_id=sandbox_session_id,
-                )
-            except Exception as e:
-                sync_error = e
-
-        if should_sync_files:
-            sync_task = asyncio.create_task(do_sync())
-            while not sync_task.done():
-                await asyncio.sleep(5)
-                if not sync_task.done():
-                    yield f"data: {json.dumps({'type': 'keepalive', 'timestamp': time.time()})}\n\n"
-
-            if sync_error:
-                raise sync_error
+        if use_axiom_execution:
+            synced_files = [
+                {
+                    "filename": item.filename,
+                    "sandbox_path": item.sandbox_path,
+                    "generated": False,
+                }
+                for item in request.execution_files
+            ]
+            files_prompt = axiom_executor.get_available_files_prompt()
         else:
-            synced_files = agent_service.get_cached_synced_files(session_id_str)
+            # Legacy mode synchronizes GenReport-owned uploads into its own runtime.
+            if request.files:
+                sync_status = "正在同步数据..." if (request.language or "").lower().startswith("zh") else "Syncing data..."
+                yield f"data: {json.dumps({'type': 'status', 'content': sync_status})}\n\n"
 
-        if request.files:
-            synced_status = (
-                f"已同步 {len(synced_files)} 个文件"
-                if (request.language or "").lower().startswith("zh")
-                else f"Synced {len(synced_files)} files"
+            sync_error = None
+            should_sync_files = bool(request.files) or not agent_service.is_session_sync_current(
+                session_id_str,
+                sandbox_session_id,
             )
-            yield f"data: {json.dumps({'type': 'status', 'content': synced_status})}\n\n"
 
-        # Build file paths info for prompt
-        files_prompt = agent_service.get_available_files_prompt(str(conversation_id))
+            async def do_sync():
+                nonlocal synced_files, sync_error
+                try:
+                    synced_files = await agent_service.sync_files_for_session(
+                        session_id_str,
+                        db,
+                        user.id,
+                        sandbox_session_id=sandbox_session_id,
+                    )
+                except Exception as e:
+                    sync_error = e
+
+            if should_sync_files:
+                sync_task = asyncio.create_task(do_sync())
+                while not sync_task.done():
+                    await asyncio.sleep(5)
+                    if not sync_task.done():
+                        yield f"data: {json.dumps({'type': 'keepalive', 'timestamp': time.time()})}\n\n"
+
+                if sync_error:
+                    raise sync_error
+            else:
+                synced_files = agent_service.get_cached_synced_files(session_id_str)
+
+            if request.files:
+                synced_status = (
+                    f"已同步 {len(synced_files)} 个文件"
+                    if (request.language or "").lower().startswith("zh")
+                    else f"Synced {len(synced_files)} files"
+                )
+                yield f"data: {json.dumps({'type': 'status', 'content': synced_status})}\n\n"
+
+            files_prompt = agent_service.get_available_files_prompt(str(conversation_id))
 
         # Track synced file paths for data loading
         sandbox_data_paths = [f.get("sandbox_path") or f"{SANDBOX_WORK_DIR}/{f['filename']}" for f in synced_files]
@@ -493,6 +523,8 @@ async def stream_chat_response(
         # Get all generated files for this session to include in report context
         generated_files_prompt = ""
         try:
+            if use_axiom_execution:
+                raise LookupError("shared sandbox uses only explicitly selected artifacts")
             from app.models.models import UploadedFile
             generated_files = db.query(UploadedFile).filter(
                 UploadedFile.conversation_id == str(conversation_id),
@@ -756,6 +788,32 @@ When you receive an error from tool execution:
 - Keep your response clean and focused on analysis results only
 - The system will automatically display all generated files and images"""
 
+        if use_axiom_execution:
+            system_prompt = system_prompt.replace(
+                "/tmp/workspace/.skills",
+                f"{request.execution_context.work_path}/.skills",
+            ).replace(
+                "/tmp/workspace",
+                request.execution_context.output_path,
+            )
+            system_prompt = system_prompt.replace(
+                "PERSISTENT variables within the same conversation",
+                "isolated commands; Python variables do not persist between calls",
+            ).replace(
+                "Variables, imports, and dataframes persist between calls in the same session",
+                "Variables, imports, and dataframes do not persist between calls; reload them from files",
+            ).replace(
+                "DO NOT reload data; reference existing variables directly",
+                "Reload required data in each isolated Python command",
+            )
+            system_prompt += (
+                "\n\nAXIOM SHARED EXECUTION:\n"
+                f"- Output directory: {request.execution_context.output_path}\n"
+                f"- Engine assets: {request.execution_context.work_path}/.skills\n"
+                "- Input files are read-only. Do not install packages at runtime; use the preinstalled environment.\n"
+                "- Every command is isolated. Persist intermediate state as files under the output directory."
+            )
+
         # Build conversation history
         model = request.model or conversation.model or settings.DEFAULT_MODEL
         inline_tool_history = should_inline_tool_results(model)
@@ -796,10 +854,15 @@ When you receive an error from tool execution:
         usage_events = []
         usage_request_id = str(uuid.uuid4())
         runtime_published_artifacts: dict[str, dict] = {}
+        finalized_artifacts = None
         
-        # Set file/session context for agent. The actual sandbox container is
-        # user-scoped so each user has at most one active OpenSandbox container.
-        agent_service.set_session(str(conversation_id))
+        tool_executor = axiom_executor if use_axiom_execution else agent_service
+        tool_definitions = (
+            axiom_executor.get_tool_definitions() if use_axiom_execution else None
+        )
+        if not use_axiom_execution:
+            # Legacy mode keeps its user-scoped OpenSandbox session cache.
+            agent_service.set_session(str(conversation_id))
         
         step = 0
         while step < max_iterations:
@@ -815,7 +878,13 @@ When you receive an error from tool execution:
             full_chunk_content = ""
             llm_stream_error = None
             
-            async for chunk in stream_with_keepalive(llm_service.stream_chat(formatted_messages, model)):
+            async for chunk in stream_with_keepalive(
+                llm_service.stream_chat(
+                    formatted_messages,
+                    model,
+                    tool_definitions=tool_definitions,
+                )
+            ):
                 if chunk["type"] == "delta":
                     response_chunks.append(chunk["content"])
                     full_response += chunk["content"]
@@ -950,7 +1019,9 @@ When you receive an error from tool execution:
                 # Execute tool with timeout and periodic keepalive
                 # For potentially long operations, we need to keep the connection alive
                 # Create task for tool execution
-                tool_task = asyncio.create_task(agent_service.execute_tool(tool_name, tool_args))
+                tool_task = asyncio.create_task(
+                    tool_executor.execute_tool(tool_name, tool_args)
+                )
                 
                 # Wait for completion with periodic keepalive
                 while not tool_task.done():
@@ -967,7 +1038,7 @@ When you receive an error from tool execution:
                 
                 # For write_file, scan and register the newly created file
                 file_path = _resolved_generated_file_path(tool_name, tool_args, result)
-                if file_path:
+                if file_path and not use_axiom_execution:
                     filename = file_path.split("/")[-1]
                     oss_url = await agent_service.file_manager.upload_generated_file(
                         str(conversation_id),
@@ -1013,11 +1084,12 @@ When you receive an error from tool execution:
                 # Include generated file URLs (especially images) so model can reference them in reports
                 if result.get("generated_files"):
                     result["generated_files"] = dedupe_generated_files(result["generated_files"])
-                    result["generated_files"] = await publish_runtime_artifacts(
-                        request.runtime_gateway,
-                        result["generated_files"],
-                        runtime_published_artifacts,
-                    )
+                    if not use_axiom_execution:
+                        result["generated_files"] = await publish_runtime_artifacts(
+                            request.runtime_gateway,
+                            result["generated_files"],
+                            runtime_published_artifacts,
+                        )
                     tool_content += "\n\n[Generated Files]"
                     for gf in result["generated_files"]:
                         if gf.get("url"):
@@ -1030,6 +1102,11 @@ When you receive an error from tool execution:
                                 f"\n  Description hint: {description}"
                                 f"\n  Embed in report exactly as-is: <p align=\"center\"><img src=\"{proxy_url}\" alt=\"{description}\" width=\"80%\"></p>"
                                 "\n  Status: already saved and registered; do not regenerate this chart to fix its path."
+                            )
+                        elif use_axiom_execution and gf.get("sandbox_path"):
+                            tool_content += (
+                                f"\n- {gf.get('filename', 'generated file')} saved at "
+                                f"{gf['sandbox_path']}"
                             )
                 
                 if not tool_content:
@@ -1100,6 +1177,14 @@ When you receive an error from tool execution:
             if tr['result'].get('generated_files'):
                 all_generated_files.extend(tr['result']['generated_files'])
         all_generated_files = dedupe_generated_files(all_generated_files)
+        if use_axiom_execution and all_generated_files:
+            finalized_artifacts = await axiom_executor.finalize_generated_files(
+                all_generated_files,
+                workspace_id=(request.runtime_gateway or {}).get("workspace_id"),
+            )
+            if not finalized_artifacts:
+                raise RuntimeError("AXIOM returned no finalized artifacts")
+            all_generated_files = dedupe_generated_files(finalized_artifacts)
         
         # Add tool execution summary if there were tool calls
         # Using special markers that frontend can detect and render as collapsible
@@ -1174,6 +1259,15 @@ When you receive an error from tool execution:
             lambda match: redact_workspace_path(match.group(0)),
             final_content_cleaned,
         )
+        if use_axiom_execution:
+            for internal_root in (
+                request.execution_context.input_path,
+                request.execution_context.work_path,
+                request.execution_context.output_path,
+            ):
+                final_content_cleaned = final_content_cleaned.replace(
+                    internal_root, "Files"
+                )
         
         # Save final assistant message with complete content and tool results
         # Combine tool_calls with results for persistence
@@ -1196,11 +1290,14 @@ When you receive an error from tool execution:
             tool_calls_with_results.append(tc_copy)
         
         # Collect all generated files for the done event
-        all_generated_files = []
-        for tr in all_tool_results:
-            if tr['result'].get('generated_files'):
-                all_generated_files.extend(tr['result']['generated_files'])
-        all_generated_files = dedupe_generated_files(all_generated_files)
+        if finalized_artifacts is not None:
+            all_generated_files = dedupe_generated_files(finalized_artifacts)
+        else:
+            all_generated_files = []
+            for tr in all_tool_results:
+                if tr['result'].get('generated_files'):
+                    all_generated_files.extend(tr['result']['generated_files'])
+            all_generated_files = dedupe_generated_files(all_generated_files)
         
         final_message = Message(
             conversation_id=conversation_id,
@@ -1230,15 +1327,23 @@ When you receive an error from tool execution:
                 metadata_json=json.dumps(usage_event["metadata"], ensure_ascii=False, default=str),
             ))
         db.commit()
-        
+
+        if axiom_executor is not None:
+            await axiom_executor.close()
+            axiom_executor = None
         yield f"data: {json.dumps({'type': 'done', 'generated_files': all_generated_files})}\n\n"
                 
     except Exception as e:
         import traceback
         error_msg = f"{str(e)}\n{traceback.format_exc()}"
         print(f"Stream error: {error_msg}")
+        if axiom_executor is not None:
+            await axiom_executor.close()
+            axiom_executor = None
         yield f"data: {json.dumps({'type': 'error', 'content': user_facing_model_error(request.language)})}\n\n"
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+    finally:
+        if axiom_executor is not None:
+            await axiom_executor.close()
 
 
 @router.post("/stream")
@@ -1248,6 +1353,15 @@ async def chat_stream(
     current_user: User = Depends(get_current_active_user)
 ):
     """Stream chat response with Server-Sent Events."""
+    if request.execution_context is None:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "execution_context_required",
+                "message": "execution_context is required for report generation",
+            },
+        )
+
     return StreamingResponse(
         stream_chat_response(request, current_user, db),
         media_type="text/event-stream",

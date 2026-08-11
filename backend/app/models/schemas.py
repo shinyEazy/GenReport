@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List, Dict, Any
+from pydantic import AnyHttpUrl, BaseModel, EmailStr, Field, model_validator
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
+from uuid import UUID
 
 
 # User schemas
@@ -78,6 +79,45 @@ class ConversationDetailResponse(ConversationResponse):
 
 
 # Chat schemas
+class ExecutionFileRequest(BaseModel):
+    artifact_id: str = Field(min_length=1)
+    filename: str = Field(min_length=1)
+    sandbox_path: str = Field(pattern=r"^/workspace/runs/[^/]+/inputs/")
+    content_type: str = "application/octet-stream"
+    size: int = Field(ge=0)
+    checksum: Optional[str] = None
+
+
+class ExecutionContextRequest(BaseModel):
+    version: Literal["v1"] = "v1"
+    run_id: str
+    conversation_id: str
+    sandbox_id: UUID
+    execution_workspace_id: UUID
+    gateway_url: AnyHttpUrl
+    capability_token: str = Field(min_length=1)
+    expires_at: int
+    input_path: str
+    work_path: str
+    output_path: str
+    capabilities: List[str]
+
+    @model_validator(mode="after")
+    def validate_run_scoped_paths(self):
+        run_root = f"/workspace/runs/{self.run_id}"
+        expected_paths = {
+            "input_path": f"{run_root}/inputs",
+            "work_path": f"{run_root}/work",
+            "output_path": f"{run_root}/outputs",
+        }
+        for field_name, expected_path in expected_paths.items():
+            if getattr(self, field_name) != expected_path:
+                raise ValueError(
+                    f"{field_name} must be exactly scoped to run_id {self.run_id!r}"
+                )
+        return self
+
+
 class ChatRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None  # hash_id
@@ -86,6 +126,8 @@ class ChatRequest(BaseModel):
     analysis_mode: Optional[str] = None
     language: Optional[str] = None
     runtime_gateway: Optional[Dict[str, Any]] = None
+    execution_context: Optional[ExecutionContextRequest] = None
+    execution_files: List[ExecutionFileRequest] = Field(default_factory=list)
 
 
 class ChatStreamResponse(BaseModel):
