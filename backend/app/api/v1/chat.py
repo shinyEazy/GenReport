@@ -14,7 +14,7 @@ from app.api.deps import get_current_active_user
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.hashid import encode_id, decode_id
-from app.core.language import get_language_profile
+from app.core.language import get_language_profile, resolve_language_request
 from app.models.models import Conversation, Message, UsageRecord, User
 from app.models.schemas import ChatRequest
 from app.services.llm_service import LLMService
@@ -355,7 +355,10 @@ async def stream_chat_response(
     if request.execution_context is None:
         raise ValueError("execution_context is required for report generation")
 
-    language_profile = get_language_profile(request.language)
+    language_profile, normalized_message = resolve_language_request(
+        request.language,
+        request.message,
+    )
     axiom_executor = None
     try:
         # Get or create conversation
@@ -373,7 +376,7 @@ async def stream_chat_response(
                 yield f"data: {json.dumps({'type': 'error', 'content': language_profile.conversation_not_found})}\n\n"
                 return
         else:
-            initial_title = language_profile.autonomous_title if request.analysis_mode == "autonomous_exploration" and not request.message.strip() else request.message
+            initial_title = language_profile.autonomous_title if request.analysis_mode == "autonomous_exploration" and not normalized_message else normalized_message
             conversation = Conversation(
                 user_id=user.id,
                 title=initial_title[:50] + "..." if len(initial_title) > 50 else initial_title,
@@ -428,7 +431,7 @@ async def stream_chat_response(
         
         # Build user message with file info (frontend-compatible format)
         autonomous_mode = request.analysis_mode == "autonomous_exploration"
-        display_message = request.message or (language_profile.autonomous_title if autonomous_mode else "")
+        display_message = normalized_message or (language_profile.autonomous_title if autonomous_mode else "")
         user_message_content = display_message
         if uploaded_files_list:
             file_names = ", ".join([f.original_name for f in uploaded_files_list])
@@ -440,7 +443,7 @@ async def stream_chat_response(
             )
         
         # Build LLM message with file contents for analysis
-        llm_message_content = AUTONOMOUS_EXPLORATION_PROMPT if autonomous_mode else request.message
+        llm_message_content = AUTONOMOUS_EXPLORATION_PROMPT if autonomous_mode else normalized_message
         if file_contents:
             llm_message_content += "\n\n[Attached files:]\n"
             for fc in file_contents:

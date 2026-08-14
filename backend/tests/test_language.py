@@ -1,6 +1,10 @@
 from datetime import datetime
 
-from app.core.language import get_language_profile, normalize_ui_language
+from app.core.language import (
+    get_language_profile,
+    normalize_ui_language,
+    resolve_language_request,
+)
 
 
 def test_normalize_ui_language_supports_vietnamese_locales() -> None:
@@ -29,3 +33,13 @@ def test_vietnamese_profile_localizes_report_generation() -> None:
     assert "Reply in Vietnamese by default" in profile.system_instruction
     assert "write reports in Vietnamese by default" in profile.system_instruction
     assert "xelatex" in profile.system_instruction
+
+
+def test_message_prefix_overrides_default_language_and_is_removed() -> None:
+    profile, message = resolve_language_request(
+        "en",
+        "vi Phân tích bộ dữ liệu này",
+    )
+
+    assert profile.code == "vi"
+    assert message == "Phân tích bộ dữ liệu này"

@@ -1,9 +1,15 @@
 from dataclasses import dataclass
 from datetime import datetime
+import re
 from typing import Literal
 
 
 LanguageCode = Literal["en", "zh", "vi"]
+_LANGUAGE_PREFIX = re.compile(
+    r"^\s*(?P<language>en|zh|vi)(?:[-_][a-z]{2})?"
+    r"(?:\s*(?:[:|,-])\s*|\s+)(?P<message>.+?)\s*$",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -107,3 +113,15 @@ def normalize_ui_language(value: str | None) -> LanguageCode:
 
 def get_language_profile(value: str | None) -> LanguageProfile:
     return PROFILES[normalize_ui_language(value)]
+
+
+def resolve_language_request(
+    language: str | None,
+    message: str,
+) -> tuple[LanguageProfile, str]:
+    """Resolve an explicit query prefix before falling back to the API locale."""
+    value = (message or "").strip()
+    match = _LANGUAGE_PREFIX.match(value)
+    if match:
+        return get_language_profile(match.group("language")), match.group("message").strip()
+    return get_language_profile(language), value
