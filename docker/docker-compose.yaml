@@ -15,6 +15,9 @@ services:
       UV_SYSTEM_PYTHON: "1"
       UV_LINK_MODE: copy
       PYTHONDONTWRITEBYTECODE: "1"
+      LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2:-false}
+      LANGCHAIN_PROJECT: ${LANGCHAIN_PROJECT:-gen-report}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
     command:
       - /bin/sh
       - -lc
