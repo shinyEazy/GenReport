@@ -1297,7 +1297,7 @@ Examples:
 - pdflatex -interaction=nonstopmode -halt-on-error report.tex
 - xelatex -interaction=nonstopmode -halt-on-error report.tex
 
-LaTeX is available if installed on the host. For English PDF reports, write a .tex file first, then compile it with pdflatex via this tool. For Chinese or mixed Chinese/English reports, use xelatex with xeCJK/ctex and Noto CJK fonts. Do not use tlmgr at runtime. For long reports or formal PDF reports, read .skills/latex_skill.md first and follow its template. Run the compiler twice if the document uses references or a table of contents.
+LaTeX is available if installed on the host. For English PDF reports, write a .tex file first, then compile it with pdflatex via this tool. For Vietnamese or mixed Vietnamese/English reports, use xelatex with fontspec and a Vietnamese-capable font. For Chinese or mixed Chinese/English reports, use xelatex with xeCJK/ctex and Noto CJK fonts. Do not use tlmgr at runtime. For long reports or formal PDF reports, read .skills/latex_skill.md first and follow its template. Run the compiler twice if the document uses references or a table of contents.
 For PPT, presentation, slides, or deck requests, read .skills/ppt_skill.md first. Prefer editable .pptx with python-pptx unless the user explicitly asks for PDF slides.
 """,
                     "parameters": {

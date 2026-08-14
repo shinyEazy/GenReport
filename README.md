@@ -37,8 +37,8 @@ backend, model interface, file workspace, and analysis tools.
 - Automatic chart, table, report, notebook, and artifact tracking in the Files
   panel.
 - Export to Jupyter Notebook, Markdown/report bundles, PDF reports, and slides.
-- English and Chinese UI support, including Chinese report generation when
-  XeLaTeX and CJK fonts are installed.
+- English, Vietnamese, and Chinese response support, including localized report generation when
+  XeLaTeX and the required fonts are installed.
 - Configurable OpenAI-style model endpoint and model list.
 - Local SQLite storage for conversations, uploads, and generated artifacts.
 

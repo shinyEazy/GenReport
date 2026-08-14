@@ -1,6 +1,6 @@
 # LAMBDA LaTeX Report Skill
 
-Use this guide when the user asks for a long report, publication-style analysis, PDF report, Chinese report, or a document that should look polished rather than like a chat answer.
+Use this guide when the user asks for a long report, publication-style analysis, PDF report, Vietnamese or Chinese report, or a document that should look polished rather than like a chat answer.
 
 ## When to use LaTeX
 
@@ -22,7 +22,7 @@ Use section titles that state findings, for example:
 
 ## Recommended LaTeX Template
 
-For English reports, use `pdflatex`. For Chinese or mixed Chinese/English reports, use `xelatex` and `fontspec`.
+For English reports, use `pdflatex`. For Vietnamese reports, use `xelatex` with `fontspec` and a Vietnamese-capable font. For Chinese or mixed Chinese/English reports, use `xelatex`, `fontspec`, and the dedicated Chinese template.
 
 The LAMBDA logo is bundled with this skill under `./res/logo.png`. In local mode, the stable compile path is `.skills/res/logo.png` relative to the current working directory. Use that path in generated reports so the logo remains an internal resource and is not uploaded as a user-visible generated file.
 
@@ -50,7 +50,7 @@ If the report language is Chinese, do not adapt the English template by only add
 \usepackage{caption}
 \usepackage{hyperref}
 
-% For Chinese or mixed Chinese/English reports, uncomment these lines and compile with xelatex:
+% For Vietnamese, Chinese, or other mixed Unicode reports, uncomment these lines and compile with xelatex:
 % \usepackage{fontspec}
 % \setmainfont{Noto Sans CJK SC}
 
@@ -407,6 +407,14 @@ English report:
 pdflatex -interaction=nonstopmode -halt-on-error -output-directory ./data/workspaces/<conversation_id> ./data/workspaces/<conversation_id>/report.tex
 ```
 
+Vietnamese or mixed Vietnamese/English report:
+
+```bash
+xelatex -interaction=nonstopmode -halt-on-error -output-directory ./data/workspaces/<conversation_id> ./data/workspaces/<conversation_id>/report.tex
+```
+
+Keep the source in UTF-8, use `fontspec`, and choose a font with full Vietnamese support. Localize the title page, summary, section headings, dates, captions, table labels, and chart text. Preserve code, column names, filenames, and technical terms when translation would reduce clarity.
+
 Chinese or mixed Chinese/English report:
 
 ```bash
@@ -419,4 +427,4 @@ Run the compiler twice if the document has a table of contents, references, or c
 
 If the user does not provide an author, use `LAMBDA`.
 
-If the user does not specify a report language, match the user's language. For Chinese reports, use `xelatex` with `Noto Sans CJK SC`.
+If the user does not specify a report language, match the user's language. For Vietnamese reports, use `xelatex` with `fontspec` and a Vietnamese-capable font. For Chinese reports, use `xelatex` with `Noto Sans CJK SC`.

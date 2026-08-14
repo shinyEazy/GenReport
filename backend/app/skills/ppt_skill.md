@@ -35,7 +35,7 @@ Use a clean modern data-presentation layout:
 - Large readable titles and bullets.
 - Three to four insight bullets per slide.
 - Full-size charts with labels and legends preserved.
-- If the UI language preference is Chinese, write titles and insights in Chinese.
+- Match the UI language preference: use Vietnamese for `vi`, Chinese for `zh`, and English otherwise.
 
 The standard figure slide should use this structure:
 

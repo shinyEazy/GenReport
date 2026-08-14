@@ -14,6 +14,7 @@ from app.api.deps import get_current_active_user
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.hashid import encode_id, decode_id
+from app.core.language import get_language_profile
 from app.models.models import Conversation, Message, UsageRecord, User
 from app.models.schemas import ChatRequest
 from app.services.llm_service import LLMService
@@ -274,9 +275,7 @@ def redact_workspace_path(path: str) -> str:
 
 def user_facing_model_error(language: str = "en") -> str:
     """Return a concise model-provider error without exposing API internals."""
-    if language == "zh":
-        return "当前模型暂不可用，请切换其他模型后重试。"
-    return "This model is temporarily unavailable. Please switch to another model and try again."
+    return get_language_profile(language).model_error
 
 
 def should_inline_tool_results(model: str) -> bool:
@@ -356,6 +355,7 @@ async def stream_chat_response(
     if request.execution_context is None:
         raise ValueError("execution_context is required for report generation")
 
+    language_profile = get_language_profile(request.language)
     axiom_executor = None
     try:
         # Get or create conversation
@@ -363,18 +363,17 @@ async def stream_chat_response(
         if request.conversation_id:
             conversation_id = decode_id(request.conversation_id)
             if conversation_id is None:
-                yield f"data: {json.dumps({'type': 'error', 'content': 'Conversation not found'})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'content': language_profile.conversation_not_found})}\n\n"
                 return
             conversation = db.query(Conversation).filter(
                 Conversation.id == conversation_id,
                 Conversation.user_id == user.id
             ).first()
             if not conversation:
-                yield f"data: {json.dumps({'type': 'error', 'content': 'Conversation not found'})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'content': language_profile.conversation_not_found})}\n\n"
                 return
         else:
-            localized_autonomous_title = "自动数据探索" if (request.language or "").lower().startswith("zh") else "Autonomous Data Exploration"
-            initial_title = localized_autonomous_title if request.analysis_mode == "autonomous_exploration" and not request.message.strip() else request.message
+            initial_title = language_profile.autonomous_title if request.analysis_mode == "autonomous_exploration" and not request.message.strip() else request.message
             conversation = Conversation(
                 user_id=user.id,
                 title=initial_title[:50] + "..." if len(initial_title) > 50 else initial_title,
@@ -429,15 +428,15 @@ async def stream_chat_response(
         
         # Build user message with file info (frontend-compatible format)
         autonomous_mode = request.analysis_mode == "autonomous_exploration"
-        display_message = request.message or ("Autonomous exploration mode" if autonomous_mode else "")
+        display_message = request.message or (language_profile.autonomous_title if autonomous_mode else "")
         user_message_content = display_message
         if uploaded_files_list:
             file_names = ", ".join([f.original_name for f in uploaded_files_list])
-            user_message_content += f"\n\n📎 **Attached {len(uploaded_files_list)} file(s):** {file_names}"
+            user_message_content += f"\n\n📎 **{language_profile.attached_files_label(len(uploaded_files_list))}:** {file_names}"
         elif use_axiom_execution and request.execution_files:
             file_names = ", ".join(item.filename for item in request.execution_files)
             user_message_content += (
-                f"\n\n📎 **Attached {len(request.execution_files)} file(s):** {file_names}"
+                f"\n\n📎 **{language_profile.attached_files_label(len(request.execution_files))}:** {file_names}"
             )
         
         # Build LLM message with file contents for analysis
@@ -473,8 +472,7 @@ async def stream_chat_response(
         else:
             # Legacy mode synchronizes GenReport-owned uploads into its own runtime.
             if request.files:
-                sync_status = "正在同步数据..." if (request.language or "").lower().startswith("zh") else "Syncing data..."
-                yield f"data: {json.dumps({'type': 'status', 'content': sync_status})}\n\n"
+                yield f"data: {json.dumps({'type': 'status', 'content': language_profile.syncing_status})}\n\n"
 
             sync_error = None
             should_sync_files = bool(request.files) or not agent_service.is_session_sync_current(
@@ -507,11 +505,7 @@ async def stream_chat_response(
                 synced_files = agent_service.get_cached_synced_files(session_id_str)
 
             if request.files:
-                synced_status = (
-                    f"已同步 {len(synced_files)} 个文件"
-                    if (request.language or "").lower().startswith("zh")
-                    else f"Synced {len(synced_files)} files"
-                )
+                synced_status = language_profile.synced_files_status(len(synced_files))
                 yield f"data: {json.dumps({'type': 'status', 'content': synced_status})}\n\n"
 
             files_prompt = agent_service.get_available_files_prompt(str(conversation_id))
@@ -548,23 +542,10 @@ async def stream_chat_response(
         except Exception:
             pass
         
-        preferred_language = "Chinese" if (request.language or "").lower().startswith("zh") else "English"
         current_dt = datetime.now()
         current_date_en = current_dt.strftime("%B %-d, %Y")
         current_date_iso = current_dt.strftime("%Y-%m-%d")
-        current_date_zh = f"{current_dt.year}年{current_dt.month}月{current_dt.day}日"
-        language_instruction = (
-            "The user's UI language preference is Chinese. Reply in Chinese by default, write reports in Chinese by default, "
-            "and use Chinese for chart titles, axis labels, legends, annotations, captions, and narrative text whenever possible. "
-            "and use xelatex for Chinese or mixed Chinese/English LaTeX/PDF outputs. When writing a Chinese PDF report, "
-            "read the dedicated Chinese LaTeX Template section in /tmp/workspace/.skills/latex_skill.md and use it directly. "
-            "Do not simply adapt the English template by adding fontspec. The Chinese template is required because it prevents "
-            "right-margin overflow, broken CJK line wrapping, and tables that run off the page. The first page must use a Chinese "
-            "摘要 block and a Chinese date format; do not use the default English LaTeX abstract environment. Keep technical names, code, "
-            "column names, and file names unchanged when translating would reduce clarity."
-            if preferred_language == "Chinese"
-            else "The user's UI language preference is English. Reply in English by default and write reports in English by default."
-        )
+        localized_report_date = language_profile.format_report_date(current_dt)
 
         # Build system prompt with paths
         system_prompt = f"""You are LAMBDA, a data analysis agent that helps users inspect datasets, run analysis, create visualizations, and produce reports.
@@ -573,11 +554,11 @@ async def stream_chat_response(
 {generated_files_prompt}
 
 USER LANGUAGE PREFERENCE:
-{language_instruction}
+{language_profile.system_instruction}
 
 CURRENT DATE AND REPORT DATE:
 - Today's date is {current_date_en} ({current_date_iso}).
-- For Chinese reports, today's date is {current_date_zh}.
+- The localized report date for {language_profile.name} is {localized_report_date}.
 - Use today's date for report titles, title pages, headers, footers, LaTeX `\\date{{...}}`, `\\reportdate`, and any generated metadata.
 - Do not reuse old example dates from templates, previous reports, screenshots, or skill files. Replace placeholder dates with today's date.
 
@@ -641,6 +622,7 @@ For shell commands and file operations, use:
    - Install packages only if truly necessary: /opt/python/versions/cpython-3.11.14-linux-x86_64-gnu/bin/python3 -m pip install package-name --break-system-packages --no-cache-dir
    - Do NOT use apt-get, sudo, pip3, tlmgr, shell chaining with ;, ||, &&, pipes, or redirection such as 2>&1
    - Compile LaTeX reports: pdflatex -interaction=nonstopmode -halt-on-error report.tex
+   - Compile Vietnamese/mixed-language LaTeX reports: xelatex -interaction=nonstopmode -halt-on-error report.tex
    - Compile Chinese/mixed-language LaTeX reports: xelatex -interaction=nonstopmode -halt-on-error report.tex
 
 For file discovery and content search, prefer:
@@ -653,7 +635,7 @@ Environment:
 - User-visible outputs are shown in the Files panel. In final replies, say generated files are available in Files, not in an internal path.
 - PRE-INSTALLED PYTHON PACKAGES: pandas, numpy, scipy, matplotlib, seaborn, scikit-learn, statsmodels, openpyxl, xlrd, plotly, python-pptx
   These packages are automatically available
-- LaTeX: pdflatex/xelatex are available if installed on the host. For English PDF reports, use pdflatex. For Chinese or mixed Chinese/English PDF reports, use xelatex with xeCJK/ctex and Noto CJK fonts. Do not use tlmgr at runtime.
+- LaTeX: pdflatex/xelatex are available if installed on the host. For English PDF reports, use pdflatex. For Vietnamese or mixed Vietnamese/English PDF reports, use xelatex with fontspec. For Chinese or mixed Chinese/English PDF reports, use xelatex with xeCJK/ctex and Noto CJK fonts. Do not use tlmgr at runtime.
 - Internal skill files live in .skills/. Users do not need to see or export this directory.
 - LaTeX skill file: .skills/latex_skill.md. When the user asks for a long report, formal PDF, paper-style document, or LaTeX report, first read this file with read_file and follow it.
 - PPT skill file: .skills/ppt_skill.md. When the user asks for a PPT, presentation, slide deck, or executive deck, first read this file with read_file and follow it. Prefer editable .pptx with python-pptx unless the user explicitly asks for PDF slides.
@@ -680,7 +662,9 @@ When user asks for a report, summary, or analysis document:
 6. For a PDF report, create LaTeX then compile it:
    - write_file path: report.tex
    - English: pdflatex -interaction=nonstopmode -halt-on-error report.tex
+   - Vietnamese/mixed language: xelatex -interaction=nonstopmode -halt-on-error report.tex
    - Chinese/mixed language: xelatex -interaction=nonstopmode -halt-on-error report.tex
+   - Vietnamese reports MUST keep all diacritics in UTF-8, use fontspec with a Vietnamese-capable font, and localize headings, dates, captions, and table labels.
    - Chinese reports MUST use the dedicated Chinese LaTeX Template from .skills/latex_skill.md. Use xeCJK/Noto Sans CJK SC, flexible tabularx columns, a Chinese 摘要 block instead of the default English abstract environment, and image widths such as 0.92\\textwidth to prevent right-margin overflow.
    - If references/TOC are used, run the compiler twice.
 7. For markdown reports, use concise headers, short paragraphs, tables, and charts near the text that explains them

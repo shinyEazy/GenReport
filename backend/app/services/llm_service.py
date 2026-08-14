@@ -120,6 +120,7 @@ class LLMService:
                             "LaTeX is available via pdflatex. Example: "
                             "pdflatex -interaction=nonstopmode -halt-on-error "
                             "-output-directory /tmp/workspace /tmp/workspace/report.tex. "
+                            "For Vietnamese PDF reports, use xelatex with fontspec and a Vietnamese-capable font. "
                             "For Chinese PDF reports, use xelatex with xeCJK/ctex and Noto CJK fonts. Do not use tlmgr at runtime. "
                             "For long LaTeX/PDF reports, read /tmp/workspace/.skills/latex_skill.md first. "
                             "For PPT or slide deck requests, read /tmp/workspace/.skills/ppt_skill.md first; "
