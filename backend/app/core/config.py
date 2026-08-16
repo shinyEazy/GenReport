@@ -135,7 +135,7 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
     
     # Agent Configuration
-    MAX_AGENT_ITERATIONS: int = 50  # Maximum tool execution iterations per conversation
+    MAX_AGENT_ITERATIONS: int = 20  # Maximum tool execution iterations per conversation
     METHOD_HUB_MCP_URL: str = "http://host.docker.internal:38000/mcp"
     REPORT_DISCOVERY_MAX_ARTIFACTS: int = 20
     REPORT_DISCOVERY_MAX_ROUNDS: int = 20
