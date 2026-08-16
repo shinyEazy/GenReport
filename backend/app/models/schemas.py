@@ -126,6 +126,9 @@ class ChatRequest(BaseModel):
     analysis_mode: Optional[str] = None
     language: Optional[str] = None
     runtime_gateway: Optional[Dict[str, Any]] = None
+    organization_id: Optional[str] = None
+    workspace_id: Optional[str] = None
+    discover_workspace_files: bool = False
     execution_context: Optional[ExecutionContextRequest] = None
     execution_files: List[ExecutionFileRequest] = Field(default_factory=list)
 

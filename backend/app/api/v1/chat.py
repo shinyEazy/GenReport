@@ -23,12 +23,32 @@ from app.services.sandbox_file_manager import SANDBOX_SKILLS_DIR, SANDBOX_WORK_D
 from app.services.runtime_gateway_client import RuntimeGatewayClient
 from app.services.axiom_execution_client import AxiomExecutionClient
 from app.services.axiom_tool_executor import AxiomToolExecutor
+from app.services.method_hub_client import MethodHubClient
+from app.services.report_file_discovery import DiscoveryAgent
+from app.services.report_input_preparation import (
+    ReportInputPreparationError,
+    ReportInputPreparationService,
+)
 from app.api.v1.files import extract_oss_object_name
 
 router = APIRouter()
 llm_service = LLMService()
 agent_service = AgentService()
 runtime_gateway_client = RuntimeGatewayClient()
+method_hub_client = MethodHubClient(settings.METHOD_HUB_MCP_URL)
+report_discovery_agent = DiscoveryAgent(
+    method_hub=method_hub_client,
+    api_key=settings.OPENAI_API_KEY,
+    base_url=settings.OPENAI_BASE_URL,
+    default_model=settings.DEFAULT_MODEL,
+    max_artifacts=settings.REPORT_DISCOVERY_MAX_ARTIFACTS,
+    max_rounds=settings.REPORT_DISCOVERY_MAX_ROUNDS,
+)
+report_input_preparation_service = ReportInputPreparationService(
+    discovery_agent=report_discovery_agent,
+    method_hub=method_hub_client,
+    runtime_gateway_client=runtime_gateway_client,
+)
 
 
 AUTONOMOUS_EXPLORATION_PROMPT = """Run AUTONOMOUS EXPLORATION MODE on the uploaded dataset.
@@ -387,6 +407,25 @@ async def stream_chat_response(
             db.refresh(conversation)
             conversation_id = conversation.id
             yield f"data: {json.dumps({'type': 'conversation_created', 'conversation_id': encode_id(conversation_id)})}\n\n"
+
+        model = request.model or conversation.model or settings.DEFAULT_MODEL
+        if request.discover_workspace_files and not request.execution_files:
+            yield f"data: {json.dumps({'type': 'status', 'content': 'Finding relevant workspace files...'})}\n\n"
+            try:
+                prepared_files = await report_input_preparation_service.prepare(
+                    query=normalized_message,
+                    existing_files=request.execution_files,
+                    discover_workspace_files=request.discover_workspace_files,
+                    organization_id=request.organization_id,
+                    workspace_id=request.workspace_id,
+                    runtime_gateway=request.runtime_gateway,
+                    model=model,
+                )
+            except ReportInputPreparationError as exc:
+                yield f"data: {json.dumps({'type': 'error', 'content': str(exc)})}\n\n"
+                return
+            request = request.model_copy(update={"execution_files": prepared_files})
+            yield f"data: {json.dumps({'type': 'status', 'content': f'Prepared {len(prepared_files)} workspace file(s).'})}\n\n"
 
         use_axiom_execution = request.execution_context is not None
         if use_axiom_execution:
@@ -802,7 +841,6 @@ When you receive an error from tool execution:
             )
 
         # Build conversation history
-        model = request.model or conversation.model or settings.DEFAULT_MODEL
         inline_tool_history = should_inline_tool_results(model)
         omit_persisted_tool_calls = inline_tool_history or is_deepseek_model(model)
         messages = db.query(Message).filter(

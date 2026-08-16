@@ -78,6 +78,7 @@ class LLMService:
         messages: List[Dict[str, Any]],
         model: str = None,
         tool_definitions: List[Dict[str, Any]] | None = None,
+        tool_choice: str | Dict[str, Any] = "auto",
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream chat completion with tool support.
         Uses model default temperature and max_tokens."""
@@ -91,7 +92,7 @@ class LLMService:
                     "type": "function",
                     "function": {
                         "name": "execute_python",
-                        "description": f"Execute Python code in sandbox. Variables persist within the same conversation session. Working directory: /tmp/workspace/",
+                        "description": "Execute Python code in sandbox. Variables persist within the same conversation session. Working directory: /tmp/workspace/",
                         "parameters": {
                             "type": "object",
                             "properties": {
@@ -146,7 +147,7 @@ class LLMService:
                     "type": "function",
                     "function": {
                         "name": "read_file",
-                        "description": f"Read file contents from sandbox. Use full path like /tmp/workspace/filename",
+                        "description": "Read file contents from sandbox. Use full path like /tmp/workspace/filename",
                         "parameters": {
                             "type": "object",
                             "properties": {
@@ -167,7 +168,7 @@ class LLMService:
                     "type": "function",
                     "function": {
                         "name": "write_file",
-                        "description": f"Write text file to sandbox. Supports csv, json, txt, html, etc. Working directory: /tmp/workspace/",
+                        "description": "Write text file to sandbox. Supports csv, json, txt, html, etc. Working directory: /tmp/workspace/",
                         "parameters": {
                             "type": "object",
                             "properties": {
@@ -192,7 +193,7 @@ class LLMService:
                     "type": "function",
                     "function": {
                         "name": "edit_file",
-                        "description": f"Edit/replace content in an existing file in sandbox. Uses string replacement.",
+                        "description": "Edit/replace content in an existing file in sandbox. Uses string replacement.",
                         "parameters": {
                             "type": "object",
                             "properties": {
@@ -326,7 +327,7 @@ class LLMService:
                 "model": provider_model,
                 "messages": messages,
                 "tools": tools,
-                "tool_choice": "auto",
+                "tool_choice": tool_choice,
                 "stream": True,
             }
 

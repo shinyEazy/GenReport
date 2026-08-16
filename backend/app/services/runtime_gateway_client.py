@@ -18,7 +18,9 @@ class RuntimeGatewayClient:
             return []
         endpoint = runtime_gateway.get("endpoint")
         token = runtime_gateway.get("token")
-        if not isinstance(endpoint, str) or not endpoint.startswith(("http://", "https://")):
+        if not isinstance(endpoint, str) or not endpoint.startswith(
+            ("http://", "https://")
+        ):
             return []
         if not isinstance(token, str) or not token:
             return []
@@ -37,6 +39,27 @@ class RuntimeGatewayClient:
         if not isinstance(mirrored, list):
             return []
         return [item for item in mirrored if isinstance(item, dict)]
+
+    async def stage_report_inputs(
+        self,
+        runtime_gateway: dict[str, Any] | None,
+        artifacts: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        endpoint, token = self._endpoint_and_token(runtime_gateway)
+        if endpoint is None or token is None:
+            raise RuntimeError("Runtime gateway is required to stage report inputs")
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            response = await client.post(
+                f"{endpoint}/sandbox/inputs:stage",
+                json={"artifacts": artifacts},
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            response.raise_for_status()
+            payload = response.json()
+        files = payload.get("execution_files")
+        if not isinstance(files, list):
+            raise RuntimeError("Runtime gateway returned invalid report inputs")
+        return [item for item in files if isinstance(item, dict)]
 
     async def record_event(
         self,
@@ -69,7 +92,9 @@ class RuntimeGatewayClient:
             return None, None
         endpoint = runtime_gateway.get("endpoint")
         token = runtime_gateway.get("token")
-        if not isinstance(endpoint, str) or not endpoint.startswith(("http://", "https://")):
+        if not isinstance(endpoint, str) or not endpoint.startswith(
+            ("http://", "https://")
+        ):
             return None, None
         if not isinstance(token, str) or not token:
             return None, None

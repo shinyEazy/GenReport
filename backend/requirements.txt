@@ -2,15 +2,22 @@ fastapi==0.115.0
 uvicorn[standard]==0.32.0
 sqlalchemy==2.0.36
 alembic==1.14.0
-pydantic==2.9.2
+pydantic==2.11.0
 pydantic-settings==2.6.1
 python-jose[cryptography]==3.3.0
 bcrypt==4.0.1
 python-multipart==0.0.17
-openai==1.54.0
+openai>=2.26.0,<3.0.0
+langchain>=1.3.11
+langchain-openai>=1.3.3
+langchain-core>=1.5.4
+langgraph>=1.2.7
+deepagents>=0.6.12
+langsmith>=0.9.5
 aiofiles==24.1.0
 python-dotenv==1.0.1
-httpx==0.27.2
+httpx==0.28.1
+mcp[cli]==1.29.0
 requests==2.32.3
 pandas==2.2.3
 numpy==2.1.3
@@ -30,3 +37,4 @@ Pillow==11.1.0
 # OSS/OpenSandbox are not required for local mode.
 # Hash IDs for conversation URL obfuscation
 hashids==1.3.1
+langchain-google-genai==4.3.0
