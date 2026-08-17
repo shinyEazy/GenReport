@@ -240,7 +240,7 @@ def _system_prompt(workspace_id: str) -> str:
         "Use the available corpus retrieval tools. If semantic retrieval fails, "
         "use BM25 lexical retrieval. Return only document IDs supported by tool "
         "results. Do not invent storage keys, bucket names, filenames, or document "
-        f"IDs. The selected workspace is {workspace_id}."
+        f"IDs. The selected workspace is {workspace_id}. RETURN 1 DOCUMENT ID ONLY."
     )
 
 

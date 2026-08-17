@@ -45,6 +45,19 @@ class AxiomToolExecutor:
         await self.client.close()
 
     async def materialize_assets(self) -> None:
+        skills_path = f"{self.work_path}/.skills"
+        setup = await self.client.execute(
+            language="python",
+            code=(
+                "from pathlib import Path\n"
+                f"Path({skills_path!r}).mkdir(parents=True, exist_ok=True)\n"
+                f"Path({f'{skills_path}/res'!r}).mkdir(parents=True, exist_ok=True)\n"
+            ),
+            cwd=self.work_path,
+            timeout_seconds=30,
+        )
+        if not setup.get("success"):
+            raise RuntimeError("Unable to initialize GenReport skill directories.")
         skills_root = Path(__file__).resolve().parents[1] / "skills"
         for name in ("latex_skill.md", "ppt_skill.md"):
             path = skills_root / name
@@ -123,7 +136,6 @@ class AxiomToolExecutor:
             if not isinstance(path, str) or path in seen:
                 continue
             seen.add(path)
-            relative = str(PurePosixPath(path).relative_to(self.output_path))
             filename = PurePosixPath(path).name
             entries.append(
                 {
