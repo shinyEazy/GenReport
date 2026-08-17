@@ -213,7 +213,7 @@ def _trace_discovery_call(
     except ImportError:
         return function
     return traceable(
-        name="genreport-file-discovery",
+        name="file-discovery",
         run_type="chain",
         project_name=os.getenv("LANGCHAIN_PROJECT") or "gen-report",
         tags=["genreport", "file-discovery"],
@@ -236,11 +236,11 @@ def _deduplicate_document_ids(values: list[str], *, limit: int) -> list[str]:
 
 def _system_prompt(workspace_id: str) -> str:
     return (
-        "Find the existing workspace documents needed for the requested report. "
+        "Find 1 document needed for the requested. "
         "Use the available corpus retrieval tools. If semantic retrieval fails, "
-        "use BM25 lexical retrieval. Return only document IDs supported by tool "
-        "results. Do not invent storage keys, bucket names, filenames, or document "
-        f"IDs. The selected workspace is {workspace_id}. RETURN 1 DOCUMENT ID ONLY."
+        "use BM25 lexical retrieval. Return only document ID supported by tool "
+        "results. "
+        "RETURN 1 DOCUMENT ID ONLY. If request is normal chit chat then no need return."
     )
 
 

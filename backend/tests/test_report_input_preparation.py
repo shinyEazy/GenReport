@@ -155,6 +155,31 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
 
         runtime_gateway.stage_report_inputs.assert_not_awaited()
 
+    async def test_allows_discovery_to_select_no_files(self) -> None:
+        discovery = AsyncMock()
+        discovery.discover.return_value = []
+        method_hub = AsyncMock()
+        runtime_gateway = AsyncMock()
+        service = ReportInputPreparationService(
+            discovery_agent=discovery,
+            method_hub=method_hub,
+            runtime_gateway_client=runtime_gateway,
+        )
+
+        files = await service.prepare(
+            query="hello",
+            existing_files=[],
+            discover_workspace_files=True,
+            organization_id="test-org",
+            workspace_id="workspace-b",
+            runtime_gateway={"endpoint": "http://runtime", "token": "secret"},
+            model="test-model",
+        )
+
+        self.assertEqual(files, [])
+        method_hub.call_tool.assert_not_awaited()
+        runtime_gateway.stage_report_inputs.assert_not_awaited()
+
     async def test_explicit_files_skip_discovery_and_metadata_lookup(self) -> None:
         existing = [
             ExecutionFileRequest(

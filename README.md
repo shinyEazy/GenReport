@@ -1,7 +1,9 @@
 <div align="center">
 
 # LAMBDA
+
 ### LArge Model-based Data Analysis Agent System
+
 [![Online App](https://img.shields.io/badge/Online%20App-Live%20Demo-ff6b6b?style=flat&logo=rocket&logoColor=white)](https://lambda.com.ai)
 [![Blog](https://img.shields.io/badge/Blog-Site-blue?style=flat&logo=readme&logoColor=white)](https://lambda.org.ai)
 [![Cases](https://img.shields.io/badge/Cases-Gallery-9cf?style=flat&logo=databricks&logoColor=white)](https://lambda.com.ai/cases)

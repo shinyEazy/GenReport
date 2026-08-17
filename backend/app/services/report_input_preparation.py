@@ -84,6 +84,9 @@ class ReportInputPreparationService:
                 "Unable to discover workspace files for this report"
             ) from exc
 
+        if not document_ids:
+            return existing_files
+
         artifacts = await self._resolve_artifacts(
             document_ids=document_ids,
             organization_id=organization_id,
