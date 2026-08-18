@@ -9,6 +9,9 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, model_validator
 
 ReportEventType = Literal[
     "report.status",
+    "report.tool.started",
+    "report.tool.completed",
+    "report.tool.failed",
     "report.output_text.delta",
     "report.usage",
     "report.failed",

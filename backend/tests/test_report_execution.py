@@ -14,8 +14,13 @@ class FakeInputPreparer:
 
 
 class FakeExecutor:
-    def __init__(self, artifact_ref: str = "artifact://report-1") -> None:
+    def __init__(
+        self,
+        artifact_ref: str = "artifact://report-1",
+        artifacts: list[dict] | None = None,
+    ) -> None:
         self.artifact_ref = artifact_ref
+        self.artifacts = artifacts
         self.closed = False
         self.todos = []
 
@@ -32,6 +37,8 @@ class FakeExecutor:
         return {"success": True, "output": "ok", "generated_files": []}
 
     async def finalize_generated_files(self, generated_files, workspace_id=None):
+        if self.artifacts is not None:
+            return self.artifacts
         return [
             {
                 "artifact_ref": self.artifact_ref,
@@ -75,6 +82,52 @@ class FailingLLM:
         raise RuntimeError("provider unavailable")
 
 
+class ToolCallingLLM:
+    default_model = "test-model"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def stream_chat(self, messages, model=None, tool_definitions=None):
+        self.calls += 1
+        if self.calls == 1:
+            yield {
+                "type": "done",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_read_1",
+                        "type": "function",
+                        "function": {
+                            "name": "read_file",
+                            "arguments": '{"path":"input.csv"}',
+                        },
+                    }
+                ],
+            }
+            return
+        yield {"type": "delta", "content": "Report ready."}
+        yield {
+            "type": "done",
+            "content": "Report ready.",
+            "tool_calls": [],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 4,
+                "reasoning_tokens": 0,
+                "total_tokens": 14,
+            },
+        }
+
+
+class RecordingRuntimeGatewayClient:
+    def __init__(self) -> None:
+        self.events = []
+
+    async def record_event(self, gateway, event_type, payload, *, status):
+        self.events.append((event_type, payload, status))
+
+
 def make_request(run_id: str = "run_1", history: str = "Earlier question"):
     payload = valid_payload()
     payload["run_id"] = run_id
@@ -95,13 +148,14 @@ def make_request(run_id: str = "run_1", history: str = "Earlier question"):
     return ReportExecutionRequest.model_validate(payload)
 
 
-def make_service(llm, executor):
+def make_service(llm, executor, runtime_gateway_client=None):
     return ReportExecutionService(
         llm_service=llm,
         input_preparer=FakeInputPreparer(),
         executor_factory=lambda request: executor,
         event_factory_builder=ReportEventFactory,
         max_iterations=3,
+        runtime_gateway_client=runtime_gateway_client,
     )
 
 
@@ -128,6 +182,40 @@ class ReportExecutionTests(unittest.IsolatedAsyncioTestCase):
             [{"artifact_ref": "artifact://report-1", "filename": "report.pdf"}],
         )
         self.assertTrue(executor.closed)
+
+    async def test_streams_tool_lifecycle_while_preserving_gateway_recording(self):
+        executor = FakeExecutor()
+        gateway = RecordingRuntimeGatewayClient()
+
+        events = await collect(
+            make_service(
+                ToolCallingLLM(),
+                executor,
+                runtime_gateway_client=gateway,
+            ).stream(make_request())
+        )
+
+        tool_events = [event for event in events if event.type.startswith("report.tool.")]
+        self.assertEqual(
+            [event.type for event in tool_events],
+            ["report.tool.started", "report.tool.completed"],
+        )
+        self.assertEqual(tool_events[0].payload["tool_call_id"], "call_read_1")
+        self.assertEqual(tool_events[0].payload["tool_name"], "read_file")
+        self.assertEqual(tool_events[0].payload["inputs"], {"path": "input.csv"})
+        self.assertEqual(tool_events[0].payload["status"], "started")
+        self.assertEqual(tool_events[1].payload["status"], "completed")
+        self.assertEqual(tool_events[1].payload.get("inputs"), {"path": "input.csv"})
+        self.assertEqual(
+            tool_events[1].payload.get("outputs"),
+            {"success": True, "output": "ok", "generated_files": []},
+        )
+        self.assertEqual(
+            [event_type for event_type, _, _ in gateway.events],
+            ["report.tool.started", "report.tool.completed"],
+        )
+        self.assertEqual(gateway.events[0][1].get("inputs"), {"path": "input.csv"})
+        self.assertEqual(gateway.events[1][1].get("outputs", {}).get("output"), "ok")
 
     async def test_concurrent_runs_do_not_share_messages_todos_or_artifacts(self):
         first_llm = FakeLLM("first history-1")
@@ -165,6 +253,18 @@ class ReportExecutionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(events[-1].type, "report.failed")
         self.assertEqual(events[-1].payload["phase"], "model")
+        self.assertTrue(executor.closed)
+
+    async def test_invalid_finalized_artifact_is_reported_as_artifact_failure(self):
+        executor = FakeExecutor(artifacts=[{"filename": "report.pdf"}])
+
+        events = await collect(
+            make_service(FakeLLM(), executor).stream(make_request())
+        )
+
+        self.assertEqual(events[-1].type, "report.failed")
+        self.assertEqual(events[-1].payload["code"], "artifact_finalization_failed")
+        self.assertEqual(events[-1].payload["phase"], "artifact")
         self.assertTrue(executor.closed)
 
 

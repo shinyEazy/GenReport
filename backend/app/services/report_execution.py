@@ -184,10 +184,77 @@ class ReportExecutionService:
                     }
                 )
                 for tool_call in tool_calls:
-                    result = await self._execute_tool(
-                        executor,
-                        effective_request,
-                        tool_call,
+                    name, arguments = self._parse_tool_call(tool_call)
+                    tool_call_id = str(tool_call.get("id") or "tool")
+                    gateway = effective_request.runtime_gateway.model_dump(mode="json")
+                    started_payload = {
+                        "tool_call_id": tool_call_id,
+                        "tool_name": name,
+                        "label": name,
+                        "phase": "tool",
+                        "status": "started",
+                        "inputs": arguments,
+                    }
+                    await self.runtime_gateway_client.record_event(
+                        gateway,
+                        "report.tool.started",
+                        started_payload,
+                        status="started",
+                    )
+                    yield event_factory.create(
+                        "report.tool.started",
+                        started_payload,
+                    )
+                    try:
+                        result = await executor.execute_tool(name, arguments)
+                    except Exception as exc:
+                        failed_payload = {
+                            "tool_call_id": tool_call_id,
+                            "tool_name": name,
+                            "label": name,
+                            "phase": "tool",
+                            "status": "failed",
+                            "inputs": arguments,
+                            "error": "Tool execution raised an exception.",
+                        }
+                        await self.runtime_gateway_client.record_event(
+                            gateway,
+                            "report.tool.failed",
+                            failed_payload,
+                            status="failed",
+                        )
+                        yield event_factory.create(
+                            "report.tool.failed",
+                            failed_payload,
+                        )
+                        raise _ReportPhaseError(
+                            code="tool_execution_failed",
+                            phase="tool",
+                            message="A report tool failed to execute.",
+                            retryable=True,
+                        ) from exc
+                    completed_status = (
+                        "completed" if result.get("success") else "failed"
+                    )
+                    completed_payload = {
+                        "tool_call_id": tool_call_id,
+                        "tool_name": name,
+                        "label": name,
+                        "phase": "tool",
+                        "status": completed_status,
+                        "success": bool(result.get("success")),
+                        "inputs": arguments,
+                        "outputs": result,
+                    }
+                    await self.runtime_gateway_client.record_event(
+                        gateway,
+                        "report.tool.completed",
+                        completed_payload,
+                        status=completed_status,
+                    )
+                    yield event_factory.create(
+                        "report.tool.completed",
+                        completed_payload,
                     )
                     generated = result.get("generated_files")
                     if isinstance(generated, list):
@@ -226,6 +293,11 @@ class ReportExecutionService:
                     generated_files,
                     workspace_id=effective_request.workspace_id,
                 )
+                completion = ReportCompletion(
+                    output_text=output_text,
+                    artifacts=artifacts,
+                    usage=usage,
+                )
             except Exception as exc:
                 raise _ReportPhaseError(
                     code="artifact_finalization_failed",
@@ -237,11 +309,6 @@ class ReportExecutionService:
             yield event_factory.create(
                 "report.usage",
                 usage.model_dump(mode="json"),
-            )
-            completion = ReportCompletion(
-                output_text=output_text,
-                artifacts=artifacts,
-                usage=usage,
             )
             yield event_factory.create(
                 "report.completed",
@@ -270,12 +337,8 @@ class ReportExecutionService:
             if executor is not None:
                 await executor.close()
 
-    async def _execute_tool(
-        self,
-        executor: AxiomToolExecutor,
-        request: ReportExecutionRequest,
-        tool_call: dict[str, Any],
-    ) -> dict[str, Any]:
+    @staticmethod
+    def _parse_tool_call(tool_call: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         function = tool_call.get("function")
         if not isinstance(function, dict):
             raise _ReportPhaseError(
@@ -294,39 +357,14 @@ class ReportExecutionService:
                 message="The report model emitted invalid tool arguments.",
                 retryable=False,
             ) from exc
-        gateway = request.runtime_gateway.model_dump(mode="json")
-        await self.runtime_gateway_client.record_event(
-            gateway,
-            "report.tool.started",
-            {"tool_call_id": tool_call.get("id"), "tool_name": name},
-            status="started",
-        )
-        try:
-            result = await executor.execute_tool(name, arguments)
-        except Exception as exc:
-            await self.runtime_gateway_client.record_event(
-                gateway,
-                "report.tool.failed",
-                {"tool_call_id": tool_call.get("id"), "tool_name": name},
-                status="failed",
-            )
+        if not isinstance(arguments, dict):
             raise _ReportPhaseError(
-                code="tool_execution_failed",
+                code="invalid_tool_arguments",
                 phase="tool",
-                message="A report tool failed to execute.",
-                retryable=True,
-            ) from exc
-        await self.runtime_gateway_client.record_event(
-            gateway,
-            "report.tool.completed",
-            {
-                "tool_call_id": tool_call.get("id"),
-                "tool_name": name,
-                "success": bool(result.get("success")),
-            },
-            status="completed" if result.get("success") else "failed",
-        )
-        return result
+                message="The report model emitted invalid tool arguments.",
+                retryable=False,
+            )
+        return name, arguments
 
     @staticmethod
     def _normalize_usage(value: dict[str, Any]) -> dict[str, int]:

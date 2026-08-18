@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import base64
 import fnmatch
 import json
 import mimetypes
+import posixpath
 import re
 from pathlib import Path, PurePosixPath
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 from app.contracts.report_execution import ExecutionFileRequest
 from app.services.axiom_execution_client import AxiomExecutionClient
@@ -20,6 +23,12 @@ IGNORED_OUTPUT_SUFFIXES = {
     ".fdb_latexmk",
     ".synctex.gz",
 }
+
+HTML_IMAGE_SRC_PATTERN = re.compile(
+    r"(?P<prefix><img\b[^>]*?\bsrc\s*=\s*)"
+    r"(?P<quote>['\"])(?P<src>[^'\"]+)(?P=quote)",
+    re.IGNORECASE,
+)
 
 
 class AxiomToolExecutor:
@@ -111,6 +120,7 @@ class AxiomToolExecutor:
     async def finalize_generated_files(
         self, generated_files: list[dict[str, Any]], workspace_id: str | None = None
     ) -> list[dict[str, Any]]:
+        await self._inline_html_images(generated_files)
         entries: list[dict[str, Any]] = []
         seen: set[str] = set()
         for item in generated_files:
@@ -128,7 +138,77 @@ class AxiomToolExecutor:
                     "artifact_type": self._file_type(filename),
                 }
             )
-        return await self.client.finalize(entries, workspace_id=workspace_id)
+        artifacts = await self.client.finalize(entries, workspace_id=workspace_id)
+        normalized: list[dict[str, Any]] = []
+        for item in artifacts:
+            artifact = dict(item)
+            artifact_ref = (
+                artifact.get("artifact_ref")
+                or artifact.get("artifact_id")
+                or artifact.get("asset_id")
+            )
+            if isinstance(artifact_ref, str) and artifact_ref.strip():
+                artifact["artifact_ref"] = artifact_ref
+            normalized.append(artifact)
+        return normalized
+
+    async def _inline_html_images(
+        self, generated_files: list[dict[str, Any]]
+    ) -> None:
+        files_by_path: dict[str, str] = {}
+        for item in generated_files:
+            path = item.get("sandbox_path") or item.get("path")
+            if isinstance(path, str):
+                files_by_path[posixpath.normpath(path)] = path
+
+        for html_path in files_by_path.values():
+            if PurePosixPath(html_path).suffix.lower() not in {".html", ".htm"}:
+                continue
+            try:
+                html = (await self.client.read_file(html_path)).decode("utf-8")
+            except (KeyError, UnicodeDecodeError):
+                continue
+
+            embedded: dict[str, str] = {}
+            for match in HTML_IMAGE_SRC_PATTERN.finditer(html):
+                src = match.group("src")
+                asset_path = self._relative_html_asset_path(html_path, src)
+                stored_path = files_by_path.get(asset_path)
+                if stored_path is None or src in embedded:
+                    continue
+                content_type = mimetypes.guess_type(stored_path)[0]
+                if not content_type or not content_type.startswith("image/"):
+                    continue
+                content = await self.client.read_file(stored_path)
+                encoded = base64.b64encode(content).decode("ascii")
+                embedded[src] = f"data:{content_type};base64,{encoded}"
+
+            if not embedded:
+                continue
+
+            updated = HTML_IMAGE_SRC_PATTERN.sub(
+                lambda match: (
+                    f"{match.group('prefix')}{match.group('quote')}"
+                    f"{embedded.get(match.group('src'), match.group('src'))}"
+                    f"{match.group('quote')}"
+                ),
+                html,
+            )
+            await self.client.write_file(html_path, updated)
+
+    @staticmethod
+    def _relative_html_asset_path(html_path: str, src: str) -> str:
+        parsed = urlsplit(src)
+        if parsed.scheme or parsed.netloc or src.startswith(("data:", "#")):
+            return ""
+        decoded_path = unquote(parsed.path)
+        if not decoded_path:
+            return ""
+        if decoded_path.startswith("/"):
+            return posixpath.normpath(decoded_path)
+        return posixpath.normpath(
+            posixpath.join(str(PurePosixPath(html_path).parent), decoded_path)
+        )
 
     async def _execute_python(self, value: dict[str, Any]) -> dict[str, Any]:
         before = await self._output_snapshot()
