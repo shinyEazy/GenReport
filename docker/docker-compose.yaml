@@ -18,6 +18,10 @@ services:
       LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2:-false}
       LANGCHAIN_PROJECT: ${LANGCHAIN_PROJECT:-gen-report}
       LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://openrouter.ai/api/v1}
+      MODEL_LIST: ${MODEL_LIST:-["deepseek/deepseek-v4-flash"]}
+      METHOD_HUB_MCP_URL: ${METHOD_HUB_MCP_URL:-http://host.docker.internal:38000/mcp}
     command:
       - /bin/sh
       - -lc

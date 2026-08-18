@@ -8,7 +8,7 @@ from urllib.parse import quote
 
 import httpx
 
-from app.models.schemas import ExecutionContextRequest
+from app.contracts.report_execution import ExecutionContextRequest
 
 FILE_CHUNK_BYTES = 8 * 1024 * 1024
 TERMINAL_COMMAND_STATUSES = {"succeeded", "failed", "timed_out", "cancelled"}

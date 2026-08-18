@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import fnmatch
 import json
 import mimetypes
@@ -8,9 +7,9 @@ import re
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from app.models.schemas import ExecutionFileRequest
-from app.services.agent_service import AgentService
+from app.contracts.report_execution import ExecutionFileRequest
 from app.services.axiom_execution_client import AxiomExecutionClient
+from app.services.tool_definitions import get_axiom_tool_definitions
 
 IGNORED_OUTPUT_SUFFIXES = {
     ".aux",
@@ -83,27 +82,10 @@ class AxiomToolExecutor:
         return "\n".join(lines)
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
-        definitions = copy.deepcopy(AgentService().get_tool_definitions())
-        for definition in definitions:
-            function = definition.get("function", {})
-            description = str(function.get("description") or "")
-            description = description.replace(
-                "/tmp/workspace/.skills", f"{self.work_path}/.skills"
-            ).replace(
-                "/tmp/workspace", self.output_path
-            ).replace(
-                "VARIABLES PERSIST between calls in the same session!",
-                "Each command is isolated; reload required variables or files in every call.",
-            ).replace(
-                "Variables persist between calls.",
-                "Commands do not preserve Python variables between calls.",
-            )
-            if function.get("name") == "execute_shell":
-                description += (
-                    " Runtime package installation is disabled; use preinstalled packages."
-                )
-            function["description"] = description
-        return definitions
+        return get_axiom_tool_definitions(
+            work_path=self.work_path,
+            output_path=self.output_path,
+        )
 
     async def execute_tool(
         self, tool_name: str, tool_input: dict[str, Any], **_: Any

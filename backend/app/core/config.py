@@ -1,65 +1,46 @@
+from __future__ import annotations
+
 import os
+from pathlib import Path
 
 from pydantic import AliasChoices, Field, model_validator
-from pydantic_settings import BaseSettings
-from typing import List
-from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
-def get_llm_config_warnings(base_url: str, api_key: str) -> List[str]:
-    warnings = []
-    normalized_base_url = (base_url or "").lower()
-    normalized_api_key = api_key or ""
-
-    if "openrouter.ai" in normalized_base_url and normalized_api_key:
-        if not normalized_api_key.startswith("sk-or-v1-"):
+def get_llm_config_warnings(base_url: str, api_key: str) -> list[str]:
+    warnings: list[str] = []
+    if "openrouter.ai" in (base_url or "").lower() and api_key:
+        if not api_key.startswith("sk-or-v1-"):
             warnings.append(
-                "OPENAI_BASE_URL points to OpenRouter, but OPENAI_API_KEY does not look like an OpenRouter key. "
-                "Use an OpenRouter key starting with sk-or-v1-, or change OPENAI_BASE_URL to your key provider."
+                "OPENAI_BASE_URL points to OpenRouter, but OPENAI_API_KEY does "
+                "not look like an OpenRouter key."
             )
-
     return warnings
 
 
 class Settings(BaseSettings):
-    # Local-first defaults. The open-source build stores data under ./data.
-    DATABASE_URL: str = "sqlite:///./data/lambda_local.db"
-    LOCAL_MODE: bool = True
-    LOCAL_USER_EMAIL: str = "local@lambda.local"
-    LOCAL_USER_NAME: str = "Local User"
-    
-    # Legacy auth utility defaults. Local mode does not require these in .env.
-    SECRET_KEY: str = "your-super-secret-key-change-in-production"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
-    
-    # LLM Configuration
+    model_config = SettingsConfigDict(
+        env_file=BACKEND_DIR / ".env",
+        extra="ignore",
+    )
+
     OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     DEFAULT_MODEL: str = Field(
         default="",
         validation_alias=AliasChoices("DEFAULT_MODEL", "MODEL"),
     )
-
-    # Models exposed in the UI. The first model is used as the default when
-    # DEFAULT_MODEL is not set, and the IDs are sent unchanged to OPENAI_BASE_URL.
-    MODEL_LIST: List[str] = Field(
-        default=[
-            "mimo-v2.5-pro",
-            "deepseek-v4-pro",
-        ],
+    MODEL_LIST: list[str] = Field(
+        default=["mimo-v2.5-pro", "deepseek-v4-pro"],
         validation_alias=AliasChoices("MODEL_LIST", "AVAILABLE_MODELS"),
     )
-    MULTIMODAL_MODELS: List[str] = [
-        "mimo-v2.5-pro",
-        "mimo-v2.5",
-    ]
+    MULTIMODAL_MODELS: list[str] = ["mimo-v2.5-pro", "mimo-v2.5"]
     MULTIMODAL_IMAGE_DETAIL: str = "high"
     MULTIMODAL_IMAGE_MAX_BYTES: int = 8 * 1024 * 1024
 
-    # Accept current LangSmith names and legacy LangChain names together.
     LANGSMITH_TRACING: bool = False
     LANGCHAIN_TRACING_V2: bool = False
     LANGSMITH_API_KEY: str = ""
@@ -68,6 +49,11 @@ class Settings(BaseSettings):
     LANGCHAIN_PROJECT: str = ""
     LANGSMITH_ENDPOINT: str = ""
     LANGCHAIN_ENDPOINT: str = ""
+
+    MAX_AGENT_ITERATIONS: int = Field(default=20, ge=1, le=100)
+    METHOD_HUB_MCP_URL: str = "http://host.docker.internal:38000/mcp"
+    REPORT_DISCOVERY_MAX_ARTIFACTS: int = Field(default=20, ge=1, le=100)
+    REPORT_DISCOVERY_MAX_ROUNDS: int = Field(default=20, ge=1, le=100)
 
     @model_validator(mode="after")
     def set_default_model_from_list(self):
@@ -101,54 +87,12 @@ class Settings(BaseSettings):
         return self
 
     @property
-    def AVAILABLE_MODELS(self) -> List[str]:
+    def AVAILABLE_MODELS(self) -> list[str]:
         return self.MODEL_LIST
 
     @property
-    def LLM_CONFIG_WARNINGS(self) -> List[str]:
+    def LLM_CONFIG_WARNINGS(self) -> list[str]:
         return get_llm_config_warnings(self.OPENAI_BASE_URL, self.OPENAI_API_KEY)
-    
-    # Code Execution
-    CODE_EXECUTION_TIMEOUT: int = 900
-    MAX_OUTPUT_LENGTH: int = 1000000
-    
-    # Local open-source build executes tools in a local workspace directory.
-    CODE_EXECUTION_MODE: str = "local"
-    LOCAL_WORKSPACE_ROOT: str = "./data/workspaces"
-    
-    # OpenSandbox Configuration
-    # Custom sandbox image with additional packages (e.g., LaTeX)
-    # Build custom image: cd sandbox-docker && docker build -t lambda-sandbox:latest .
-    SANDBOX_IMAGE: str = "opensandbox/code-interpreter:v1.0.2"
-    
-    # OpenSandbox container max lifetime. OpenSandbox treats this as container
-    # TTL, not app-level idle timeout, so keep it comfortably above user work.
-    SANDBOX_CONTAINER_TIMEOUT_MINUTES: int = 180
-
-    # App-level idle timeout. The backend reaps sessions after this much
-    # inactivity, while active sandboxes can live longer than 30 minutes.
-    SANDBOX_IDLE_TIMEOUT_MINUTES: int = 30
-    SANDBOX_CLEANUP_ORPHANS_ON_STARTUP: bool = True
-    SANDBOX_PREINSTALLED_PACKAGES: bool = False
-    
-    # CORS
-    FRONTEND_URL: str = "http://localhost:3000"
-    
-    # Agent Configuration
-    MAX_AGENT_ITERATIONS: int = 20  # Maximum tool execution iterations per conversation
-    METHOD_HUB_MCP_URL: str = "http://host.docker.internal:38000/mcp"
-    REPORT_DISCOVERY_MAX_ARTIFACTS: int = 20
-    REPORT_DISCOVERY_MAX_ROUNDS: int = 20
-    
-    # Aliyun OSS Configuration (unused in local mode)
-    ALIYUN_OSS_ACCESS_KEY_ID: str = ""
-    ALIYUN_OSS_ACCESS_KEY_SECRET: str = ""
-    ALIYUN_OSS_BUCKET_NAME: str = "lambda-app-prod"
-    ALIYUN_OSS_ENDPOINT: str = "oss-cn-hongkong.aliyuncs.com"
-    ALIYUN_OSS_BASE_URL: str = "https://lambda-app-prod.oss-cn-hongkong.aliyuncs.com"
-    
-    # File Storage Mode
-    FILE_STORAGE_MODE: str = "local"
 
     @classmethod
     def settings_customise_sources(
@@ -159,11 +103,7 @@ class Settings(BaseSettings):
         dotenv_settings,
         file_secret_settings,
     ):
-        return init_settings, dotenv_settings, env_settings, file_secret_settings
-    
-    class Config:
-        env_file = BACKEND_DIR / ".env"
-
+        return init_settings, env_settings, dotenv_settings, file_secret_settings
 
 def configure_langsmith_environment(value: Settings) -> None:
     tracing = "true" if value.LANGSMITH_TRACING else "false"

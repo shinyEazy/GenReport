@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import AsyncMock
 
-from app.models.schemas import ExecutionFileRequest
+from app.contracts.report_execution import ExecutionFileRequest
 from app.services.report_input_preparation import (
     ReportInputPreparationError,
     ReportInputPreparationService,

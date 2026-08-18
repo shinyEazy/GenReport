@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from app.models.schemas import ExecutionFileRequest
-from app.services.method_hub_client import MethodHubClient
-from app.services.report_file_discovery import DiscoveryAgent
-from app.services.runtime_gateway_client import RuntimeGatewayClient
+from app.contracts.report_execution import ExecutionFileRequest
+
+if TYPE_CHECKING:
+    from app.services.method_hub_client import MethodHubClient
+    from app.services.report_file_discovery import DiscoveryAgent
+    from app.services.runtime_gateway_client import RuntimeGatewayClient
 
 
 logger = logging.getLogger(__name__)

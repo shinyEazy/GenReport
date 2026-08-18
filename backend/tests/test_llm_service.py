@@ -6,6 +6,17 @@ from app.services.llm_service import LLMService
 
 
 class LLMServiceCompatibilityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_stream_chat_requires_stateless_tool_definitions(self) -> None:
+        service = object.__new__(LLMService)
+        service.default_model = "test-model"
+
+        with self.assertRaisesRegex(ValueError, "tool_definitions"):
+            await anext(
+                service.stream_chat(
+                    [{"role": "user", "content": "Create a report"}],
+                )
+            )
+
     async def test_chat_uses_async_openai_completion_contract(self) -> None:
         service = object.__new__(LLMService)
         completion = AsyncMock(

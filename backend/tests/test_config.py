@@ -6,6 +6,9 @@ from app.core.config import Settings, configure_langsmith_environment
 
 
 class LangSmithSettingsTests(unittest.TestCase):
+    def test_settings_have_no_genreport_service_token(self) -> None:
+        self.assertNotIn("GEN_REPORT_API_TOKEN", Settings.model_fields)
+
     def test_accepts_current_and_legacy_key_names_together(self) -> None:
         with patch.dict(
             os.environ,
