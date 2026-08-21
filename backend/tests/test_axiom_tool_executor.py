@@ -1,5 +1,6 @@
 import unittest
 
+from app.contracts.report_execution import ExecutionFileRequest
 from app.services.axiom_tool_executor import AxiomToolExecutor
 
 
@@ -33,6 +34,32 @@ class FakeExecutionClient:
 
 
 class AxiomToolExecutorTests(unittest.IsolatedAsyncioTestCase):
+    async def test_read_file_does_not_return_raw_binary_image_bytes(self):
+        image_path = "/workspace/runs/resp_1/inputs/chart.png"
+        client = FakeExecutionClient(files={image_path: b"\x89PNG\r\n\x1a\n\x00raw"})
+        executor = AxiomToolExecutor(
+            client=client,
+            files=[
+                ExecutionFileRequest(
+                    artifact_id="image-1",
+                    filename="chart.png",
+                    sandbox_path=image_path,
+                    content_type="image/png",
+                    size=13,
+                )
+            ],
+            input_path="/workspace/runs/resp_1/inputs",
+            work_path="/workspace/runs/resp_1/work",
+            output_path="/workspace/runs/resp_1/outputs",
+        )
+
+        result = await executor.execute_tool("read_file", {"path": image_path})
+
+        self.assertTrue(result["success"])
+        self.assertIn("attached to the report prompt", result["output"])
+        self.assertNotIn("content", result)
+        self.assertNotIn("\x00", result["output"])
+
     async def test_materialize_assets_creates_skill_directories_before_writing(self):
         client = FakeExecutionClient()
         executor = AxiomToolExecutor(

@@ -7,8 +7,10 @@ from .report_execution import (
     ReportExecutionRequest,
     ReportFailure,
     ReportHistoryMessage,
+    ReportInputsSelected,
     ReportUsage,
     RuntimeGatewayCapability,
+    SelectedReportInput,
 )
 
 __all__ = [
@@ -20,6 +22,8 @@ __all__ = [
     "ReportExecutionRequest",
     "ReportFailure",
     "ReportHistoryMessage",
+    "ReportInputsSelected",
     "ReportUsage",
     "RuntimeGatewayCapability",
+    "SelectedReportInput",
 ]

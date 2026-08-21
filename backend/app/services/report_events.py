@@ -10,6 +10,7 @@ from app.contracts.report_execution import (
     ReportEventType,
     ReportExecutionRequest,
     ReportFailure,
+    ReportInputsSelected,
     ReportUsage,
 )
 
@@ -43,6 +44,7 @@ class ReportEventFactory:
         payload: dict[str, Any],
     ) -> dict[str, Any]:
         models = {
+            "report.inputs.selected": ReportInputsSelected,
             "report.usage": ReportUsage,
             "report.failed": ReportFailure,
             "report.completed": ReportCompletion,

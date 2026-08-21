@@ -108,6 +108,27 @@ class ReportExecutionContractTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             ReportExecutionRequest.model_validate(payload)
 
+    def test_primary_source_must_match_exactly_one_execution_file(self):
+        payload = valid_payload()
+        payload["primary_source_id"] = "source-primary"
+        payload["execution_files"][0].update(
+            {
+                "source_id": "source-primary",
+                "document_id": "document-primary",
+                "source_object_key": "organizations/org-1/sources/latest.csv",
+                "source_last_modified": "2026-08-20T09:00:00Z",
+            }
+        )
+
+        request = ReportExecutionRequest.model_validate(payload)
+
+        self.assertEqual(request.primary_source_id, "source-primary")
+        self.assertEqual(request.execution_files[0].source_id, "source-primary")
+
+        payload["execution_files"][0]["source_id"] = "source-other"
+        with self.assertRaisesRegex(ValidationError, "primary_source_id"):
+            ReportExecutionRequest.model_validate(payload)
+
     def test_event_factory_emits_complete_correlation_envelope(self):
         request = ReportExecutionRequest.model_validate(valid_payload())
         usage = ReportUsage(

@@ -80,6 +80,27 @@ cp backend/.env.example backend/.env
 
 Set the model credentials and optional Method Hub endpoint.
 
+### Local CLI mode
+
+For a host-local report run, set `LOCAL_MODE=true` in `backend/.env`, then
+create a YAML config from `backend/config.local.example.yaml`:
+
+```bash
+cd backend
+python -m app.local_report --config config.local.yaml
+```
+
+Relative entries in `files` resolve from the YAML file's directory. The CLI
+copies them into `data/workspaces/<run_id>/inputs` and writes generated report
+artifacts under `data/workspaces/<run_id>/outputs`.
+
+`model`, `openai_api_key`, and `openai_base_url` are loaded directly from the
+local YAML config for each CLI run. Keep this file out of version control.
+
+Local mode runs model-generated Python and shell commands as the invoking host
+user. The workspace structure constrains GenReport paths, but it is not an OS
+or container sandbox; use the AXIOM Sandbox Service for untrusted requests.
+
 ## Run
 
 ```bash

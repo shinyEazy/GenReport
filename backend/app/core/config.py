@@ -34,12 +34,17 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("DEFAULT_MODEL", "MODEL"),
     )
     MODEL_LIST: list[str] = Field(
-        default=["mimo-v2.5-pro", "deepseek-v4-pro"],
+        default=["qwen/qwen3.7-flash"],
         validation_alias=AliasChoices("MODEL_LIST", "AVAILABLE_MODELS"),
     )
-    MULTIMODAL_MODELS: list[str] = ["mimo-v2.5-pro", "mimo-v2.5"]
+    MULTIMODAL_MODELS: list[str] = Field(
+        default=["qwen/qwen3.7-flash"],
+    )
     MULTIMODAL_IMAGE_DETAIL: str = "high"
-    MULTIMODAL_IMAGE_MAX_BYTES: int = 8 * 1024 * 1024
+    MULTIMODAL_IMAGE_MAX_BYTES: int = Field(
+        default=8 * 1024 * 1024,
+        ge=1,
+    )
 
     LANGSMITH_TRACING: bool = False
     LANGCHAIN_TRACING_V2: bool = False
@@ -50,10 +55,13 @@ class Settings(BaseSettings):
     LANGSMITH_ENDPOINT: str = ""
     LANGCHAIN_ENDPOINT: str = ""
 
-    MAX_AGENT_ITERATIONS: int = Field(default=20, ge=1, le=100)
+    MAX_AGENT_ITERATIONS: int = Field(default=100, ge=1, le=100)
     METHOD_HUB_MCP_URL: str = "http://host.docker.internal:38000/mcp"
     REPORT_DISCOVERY_MAX_ARTIFACTS: int = Field(default=20, ge=1, le=100)
     REPORT_DISCOVERY_MAX_ROUNDS: int = Field(default=20, ge=1, le=100)
+    LOCAL_MODE: bool = False
+    LOCAL_WORKSPACE_ROOT: Path = BACKEND_DIR / "data" / "workspaces"
+    LOCAL_EXECUTION_TIMEOUT_SECONDS: int = Field(default=120, ge=1, le=3600)
 
     @model_validator(mode="after")
     def set_default_model_from_list(self):

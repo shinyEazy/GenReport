@@ -1,11 +1,23 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from app.services.llm_service import LLMService
 
 
 class LLMServiceCompatibilityTests(unittest.IsolatedAsyncioTestCase):
+    @patch("app.services.llm_service.openai.AsyncOpenAI")
+    async def test_constructor_uses_per_run_provider_settings(self, client_factory) -> None:
+        LLMService(
+            api_key="config-key",
+            base_url="https://provider.example/v1",
+        )
+
+        client_factory.assert_called_once_with(
+            api_key="config-key",
+            base_url="https://provider.example/v1",
+        )
+
     async def test_stream_chat_requires_stateless_tool_definitions(self) -> None:
         service = object.__new__(LLMService)
         service.default_model = "test-model"

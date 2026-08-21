@@ -35,6 +35,32 @@ class ReportPromptTests(unittest.TestCase):
         self.assertIn(self.request.execution_context.output_path, serialized)
         self.assertNotIn("/tmp/workspace", serialized)
         self.assertNotIn("conversation", serialized.lower())
+        self.assertIn(
+            f"{self.request.execution_context.work_path}/.skills/latex_skill.md",
+            serialized,
+        )
+        self.assertIn("PyMuPDF (fitz)", serialized)
+
+    def test_attaches_images_after_the_text_instruction(self):
+        image_part = {
+            "type": "image_url",
+            "image_url": {
+                "url": "data:image/png;base64,aW1hZ2U=",
+                "detail": "high",
+            },
+        }
+
+        messages = build_report_messages(
+            self.request,
+            available_files="AVAILABLE INPUT FILES:\n- chart.png",
+            image_parts=[image_part],
+        )
+
+        self.assertEqual(
+            messages[-1]["content"][0],
+            {"type": "text", "text": f"Current report instruction:\n{self.request.instruction}"},
+        )
+        self.assertEqual(messages[-1]["content"][1], image_part)
 
 
 if __name__ == "__main__":

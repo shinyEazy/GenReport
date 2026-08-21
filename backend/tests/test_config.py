@@ -1,8 +1,9 @@
 import os
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from app.core.config import Settings, configure_langsmith_environment
+from app.core.config import BACKEND_DIR, Settings, configure_langsmith_environment
 
 
 class LangSmithSettingsTests(unittest.TestCase):
@@ -66,6 +67,28 @@ class LangSmithSettingsTests(unittest.TestCase):
                 os.environ["LANGCHAIN_ENDPOINT"],
                 "https://api.smith.langchain.com",
             )
+
+    def test_local_mode_defaults_to_disabled(self) -> None:
+        settings = Settings(_env_file=None)
+
+        self.assertFalse(settings.LOCAL_MODE)
+        self.assertEqual(
+            settings.LOCAL_WORKSPACE_ROOT,
+            BACKEND_DIR / "data" / "workspaces",
+        )
+
+    def test_local_mode_accepts_workspace_configuration(self) -> None:
+        settings = Settings(
+            _env_file=None,
+            LOCAL_MODE="true",
+            LOCAL_WORKSPACE_ROOT="/tmp/gen-report-workspaces",
+        )
+
+        self.assertTrue(settings.LOCAL_MODE)
+        self.assertEqual(
+            settings.LOCAL_WORKSPACE_ROOT,
+            Path("/tmp/gen-report-workspaces"),
+        )
 
 
 if __name__ == "__main__":

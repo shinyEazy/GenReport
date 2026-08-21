@@ -47,6 +47,8 @@ def get_report_execution_service() -> ReportExecutionService:
             input_path=request.execution_context.input_path,
             work_path=request.execution_context.work_path,
             output_path=request.execution_context.output_path,
+            multimodal_image_detail=settings.MULTIMODAL_IMAGE_DETAIL,
+            multimodal_image_max_bytes=settings.MULTIMODAL_IMAGE_MAX_BYTES,
         )
 
     return ReportExecutionService(
@@ -56,6 +58,7 @@ def get_report_execution_service() -> ReportExecutionService:
         event_factory_builder=ReportEventFactory,
         max_iterations=settings.MAX_AGENT_ITERATIONS,
         runtime_gateway_client=runtime_gateway_client,
+        multimodal_models=settings.MULTIMODAL_MODELS,
     )
 
 

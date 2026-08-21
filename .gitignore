@@ -94,3 +94,6 @@ feedback/
 # Backend generated files
 backend/data/reports/
 backend/*.tex
+
+config.yaml
+docs/superpowers/

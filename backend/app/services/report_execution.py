@@ -11,6 +11,7 @@ from app.contracts.report_execution import (
     ReportEvent,
     ReportExecutionRequest,
     ReportFailure,
+    ReportInputsSelected,
     ReportUsage,
 )
 from app.services.axiom_tool_executor import AxiomToolExecutor
@@ -61,6 +62,7 @@ class ReportExecutionService:
         event_factory_builder: Callable[[ReportExecutionRequest], ReportEventFactory],
         max_iterations: int,
         runtime_gateway_client: RuntimeGatewayClient | None = None,
+        multimodal_models: list[str] | tuple[str, ...] = (),
     ) -> None:
         self.llm_service = llm_service
         self.input_preparer = input_preparer
@@ -68,6 +70,11 @@ class ReportExecutionService:
         self.event_factory_builder = event_factory_builder
         self.max_iterations = max(1, max_iterations)
         self.runtime_gateway_client = runtime_gateway_client or RuntimeGatewayClient()
+        self.multimodal_models = {
+            model.strip().casefold()
+            for model in multimodal_models
+            if model.strip()
+        }
 
     async def stream(
         self,
@@ -81,7 +88,7 @@ class ReportExecutionService:
                 {"phase": "preparing", "message": "Preparing report execution."},
             )
             try:
-                files = await self.input_preparer.prepare(
+                prepared_inputs = await self.input_preparer.prepare(
                     query=request.workspace_discovery_instruction
                     or request.instruction,
                     existing_files=list(request.execution_files),
@@ -90,6 +97,7 @@ class ReportExecutionService:
                     workspace_id=request.workspace_id,
                     runtime_gateway=request.runtime_gateway.model_dump(mode="json"),
                     model=request.model,
+                    primary_source_id=request.primary_source_id,
                 )
             except ReportInputPreparationError as exc:
                 raise _ReportPhaseError(
@@ -99,12 +107,28 @@ class ReportExecutionService:
                     retryable=True,
                 ) from exc
 
-            effective_request = request.model_copy(update={"execution_files": files})
+            effective_request = request.model_copy(
+                update={"execution_files": prepared_inputs.files}
+            )
             executor = self.executor_factory(effective_request)
             await executor.materialize_assets()
+            yield event_factory.create(
+                "report.inputs.selected",
+                ReportInputsSelected(
+                    inputs=prepared_inputs.selected_inputs
+                ).model_dump(mode="json"),
+            )
+            selected_model = (
+                effective_request.model
+                or getattr(self.llm_service, "default_model", "")
+            )
+            image_parts: list[dict[str, Any]] | None = None
+            if self._is_multimodal_model(selected_model):
+                image_parts = await executor.get_multimodal_image_parts()
             messages = build_report_messages(
                 effective_request,
                 available_files=executor.get_available_files_prompt(),
+                image_parts=image_parts,
             )
             generated_files: list[dict[str, Any]] = []
             output_parts: list[str] = []
@@ -365,6 +389,9 @@ class ReportExecutionService:
                 retryable=False,
             )
         return name, arguments
+
+    def _is_multimodal_model(self, model: str | None) -> bool:
+        return bool(model and model.strip().casefold() in self.multimodal_models)
 
     @staticmethod
     def _normalize_usage(value: dict[str, Any]) -> dict[str, int]:

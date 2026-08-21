@@ -2,15 +2,40 @@ import asyncio
 import json
 import unittest
 
-from app.contracts.report_execution import ReportExecutionRequest
+from app.contracts.report_execution import (
+    ExecutionFileRequest,
+    ReportExecutionRequest,
+    SelectedReportInput,
+)
+from app.services.axiom_tool_executor import AxiomToolExecutor
 from app.services.report_events import ReportEventFactory
 from app.services.report_execution import ReportExecutionService
+from app.services.report_input_preparation import PreparedReportInputs
 from tests.test_report_contract import valid_payload
 
 
 class FakeInputPreparer:
     async def prepare(self, **kwargs):
-        return kwargs["existing_files"]
+        primary_source_id = kwargs.get("primary_source_id")
+        files = kwargs["existing_files"]
+        return PreparedReportInputs(
+            files=files,
+            selected_inputs=[
+                SelectedReportInput(
+                    source_id=item.source_id or item.artifact_id,
+                    document_id=item.document_id,
+                    object_key=item.source_object_key or item.artifact_id,
+                    filename=item.filename,
+                    content_type=item.content_type,
+                    role=(
+                        "primary"
+                        if item.source_id == primary_source_id
+                        else "related"
+                    ),
+                )
+                for item in files
+            ],
+        )
 
 
 class FakeExecutor:
@@ -18,9 +43,12 @@ class FakeExecutor:
         self,
         artifact_ref: str = "artifact://report-1",
         artifacts: list[dict] | None = None,
+        image_parts: list[dict] | None = None,
     ) -> None:
         self.artifact_ref = artifact_ref
         self.artifacts = artifacts
+        self.image_parts = image_parts or []
+        self.image_part_calls = 0
         self.closed = False
         self.todos = []
 
@@ -32,6 +60,10 @@ class FakeExecutor:
 
     def get_tool_definitions(self):
         return [{"type": "function", "function": {"name": "read_file"}}]
+
+    async def get_multimodal_image_parts(self):
+        self.image_part_calls += 1
+        return self.image_parts
 
     async def execute_tool(self, tool_name, tool_input):
         return {"success": True, "output": "ok", "generated_files": []}
@@ -128,6 +160,16 @@ class RecordingRuntimeGatewayClient:
         self.events.append((event_type, payload, status))
 
 
+class ImageExecutionClient:
+    def __init__(self, files: dict[str, bytes]) -> None:
+        self.files = files
+        self.read_paths: list[str] = []
+
+    async def read_file(self, path: str) -> bytes:
+        self.read_paths.append(path)
+        return self.files[path]
+
+
 def make_request(run_id: str = "run_1", history: str = "Earlier question"):
     payload = valid_payload()
     payload["run_id"] = run_id
@@ -148,7 +190,12 @@ def make_request(run_id: str = "run_1", history: str = "Earlier question"):
     return ReportExecutionRequest.model_validate(payload)
 
 
-def make_service(llm, executor, runtime_gateway_client=None):
+def make_service(
+    llm,
+    executor,
+    runtime_gateway_client=None,
+    multimodal_models: list[str] | None = None,
+):
     return ReportExecutionService(
         llm_service=llm,
         input_preparer=FakeInputPreparer(),
@@ -156,6 +203,7 @@ def make_service(llm, executor, runtime_gateway_client=None):
         event_factory_builder=ReportEventFactory,
         max_iterations=3,
         runtime_gateway_client=runtime_gateway_client,
+        multimodal_models=multimodal_models or [],
     )
 
 
@@ -172,6 +220,7 @@ class ReportExecutionTests(unittest.IsolatedAsyncioTestCase):
             [event.type for event in events],
             [
                 "report.status",
+                "report.inputs.selected",
                 "report.output_text.delta",
                 "report.usage",
                 "report.completed",
@@ -182,6 +231,137 @@ class ReportExecutionTests(unittest.IsolatedAsyncioTestCase):
             [{"artifact_ref": "artifact://report-1", "filename": "report.pdf"}],
         )
         self.assertTrue(executor.closed)
+
+    async def test_multimodal_model_attaches_declared_image_parts(self):
+        image_part = {
+            "type": "image_url",
+            "image_url": {
+                "url": "data:image/png;base64,aW1hZ2U=",
+                "detail": "high",
+            },
+        }
+        llm = FakeLLM()
+        executor = FakeExecutor(image_parts=[image_part])
+        request = make_request().model_copy(update={"model": "qwen/qwen3.7-flash"})
+
+        await collect(
+            make_service(
+                llm,
+                executor,
+                multimodal_models=["qwen/qwen3.7-flash"],
+            ).stream(request)
+        )
+
+        self.assertEqual(executor.image_part_calls, 1)
+        self.assertEqual(llm.messages[-1]["content"][0]["type"], "text")
+        self.assertEqual(llm.messages[-1]["content"][1], image_part)
+
+    async def test_text_only_model_does_not_read_declared_image_parts(self):
+        llm = FakeLLM()
+        executor = FakeExecutor(
+            image_parts=[
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "data:image/png;base64,aW1hZ2U=",
+                        "detail": "high",
+                    },
+                }
+            ]
+        )
+        request = make_request().model_copy(update={"model": "text-only-model"})
+
+        await collect(
+            make_service(
+                llm,
+                executor,
+                multimodal_models=["qwen/qwen3.7-flash"],
+            ).stream(request)
+        )
+
+        self.assertEqual(executor.image_part_calls, 0)
+        self.assertIsInstance(llm.messages[-1]["content"], str)
+
+    async def test_executor_encodes_only_bounded_declared_images(self):
+        image_path = "/workspace/runs/run_1/inputs/chart.png"
+        client = ImageExecutionClient({image_path: b"image"})
+        executor = AxiomToolExecutor(
+            client=client,
+            files=[
+                ExecutionFileRequest(
+                    artifact_id="image",
+                    filename="chart.png",
+                    sandbox_path=image_path,
+                    content_type="image/png",
+                    size=5,
+                ),
+                ExecutionFileRequest(
+                    artifact_id="text",
+                    filename="notes.txt",
+                    sandbox_path="/workspace/runs/run_1/inputs/notes.txt",
+                    content_type="text/plain",
+                    size=5,
+                ),
+                ExecutionFileRequest(
+                    artifact_id="large",
+                    filename="large.png",
+                    sandbox_path="/workspace/runs/run_1/inputs/large.png",
+                    content_type="image/png",
+                    size=6,
+                ),
+                ExecutionFileRequest(
+                    artifact_id="missing",
+                    filename="missing.png",
+                    sandbox_path="/workspace/runs/run_1/inputs/missing.png",
+                    content_type="image/png",
+                    size=5,
+                ),
+            ],
+            input_path="/workspace/runs/run_1/inputs",
+            work_path="/workspace/runs/run_1/work",
+            output_path="/workspace/runs/run_1/outputs",
+            multimodal_image_detail="low",
+            multimodal_image_max_bytes=5,
+        )
+
+        parts = await executor.get_multimodal_image_parts()
+
+        self.assertEqual(
+            client.read_paths,
+            [image_path, "/workspace/runs/run_1/inputs/missing.png"],
+        )
+        self.assertEqual(
+            parts,
+            [
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "data:image/png;base64,aW1hZ2U=",
+                        "detail": "low",
+                    },
+                }
+            ],
+        )
+
+    async def test_emits_selected_primary_input_before_report_completion(self):
+        payload = valid_payload()
+        payload["primary_source_id"] = "source-primary"
+        payload["execution_files"][0].update(
+            {
+                "source_id": "source-primary",
+                "document_id": "document-primary",
+                "source_object_key": "organizations/org-1/sources/latest.csv",
+            }
+        )
+        request = ReportExecutionRequest.model_validate(payload)
+
+        events = await collect(
+            make_service(FakeLLM(), FakeExecutor()).stream(request)
+        )
+
+        selected = next(event for event in events if event.type == "report.inputs.selected")
+        self.assertEqual(selected.payload["inputs"][0]["role"], "primary")
+        self.assertEqual([event.type for event in events][-2:], ["report.usage", "report.completed"])
 
     async def test_streams_tool_lifecycle_while_preserving_gateway_recording(self):
         executor = FakeExecutor()

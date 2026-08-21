@@ -45,7 +45,6 @@ class StatelessArchitectureTests(unittest.TestCase):
             "UsageRecord",
             "class Conversation(",
             "class Message(",
-            "LOCAL_WORKSPACE_ROOT",
             "FILE_STORAGE_MODE",
             "CODE_EXECUTION_MODE",
             "get_opensandbox_service",

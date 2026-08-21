@@ -9,6 +9,7 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, model_validator
 
 ReportEventType = Literal[
     "report.status",
+    "report.inputs.selected",
     "report.tool.started",
     "report.tool.completed",
     "report.tool.failed",
@@ -36,6 +37,10 @@ class ExecutionFileRequest(BaseModel):
     content_type: str = "application/octet-stream"
     size: int = Field(ge=0)
     checksum: str | None = None
+    source_id: str | None = Field(default=None, max_length=2048)
+    document_id: str | None = Field(default=None, max_length=255)
+    source_object_key: str | None = Field(default=None, max_length=2048)
+    source_last_modified: datetime | None = None
 
 
 class ExecutionContextRequest(BaseModel):
@@ -104,6 +109,7 @@ class ReportExecutionRequest(BaseModel):
         default=None,
         max_length=20_000,
     )
+    primary_source_id: str | None = Field(default=None, max_length=2048)
 
     @model_validator(mode="after")
     def validate_run_scope(self):
@@ -117,6 +123,15 @@ class ReportExecutionRequest(BaseModel):
         for item in self.execution_files:
             if not item.sandbox_path.startswith(input_prefix):
                 raise ValueError("execution file sandbox_path must match run_id")
+        if self.primary_source_id is not None:
+            primary_count = sum(
+                item.source_id == self.primary_source_id
+                for item in self.execution_files
+            )
+            if primary_count != 1:
+                raise ValueError(
+                    "primary_source_id must match exactly one execution file source_id"
+                )
         return self
 
 
@@ -164,6 +179,23 @@ class ReportCompletion(BaseModel):
     output_text: str
     artifacts: list[ReportArtifact] = Field(default_factory=list)
     usage: ReportUsage | None = None
+
+
+class SelectedReportInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_id: str = Field(min_length=1, max_length=2048)
+    document_id: str | None = Field(default=None, max_length=255)
+    object_key: str = Field(min_length=1, max_length=2048)
+    filename: str = Field(min_length=1, max_length=512)
+    content_type: str | None = Field(default=None, max_length=255)
+    role: Literal["primary", "related"]
+
+
+class ReportInputsSelected(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    inputs: list[SelectedReportInput] = Field(default_factory=list, max_length=100)
 
 
 class ReportEvent(BaseModel):

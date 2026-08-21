@@ -1,3 +1,4 @@
+import logging
 import unittest
 from unittest.mock import AsyncMock
 
@@ -13,11 +14,13 @@ def metadata_result(
     *,
     workspace_id: str = "workspace-b",
     filename: str = "uet.xlsx",
+    source_id: str | None = None,
 ) -> dict:
     return {
         "result": {
             "document": {
                 "document_id": document_id,
+                "source_id": source_id or f"source-{document_id}",
                 "workspace_id": workspace_id,
                 "object_key": (
                     f"organizations/test-org/workspaces/{workspace_id}/sources/{filename}"
@@ -52,7 +55,7 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             runtime_gateway_client=runtime_gateway,
         )
 
-        files = await service.prepare(
+        prepared = await service.prepare(
             query="Create a UET report",
             existing_files=[],
             discover_workspace_files=True,
@@ -62,7 +65,7 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             model="test-model",
         )
 
-        self.assertEqual(files[0].artifact_id, "asset-1")
+        self.assertEqual(prepared.files[0].artifact_id, "asset-1")
         method_hub.call_tool.assert_awaited_once_with(
             "corpus_get_file_ingested_data",
             {
@@ -82,6 +85,7 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
                     "filename": "uet.xlsx",
                     "bucket": "axiom-documents",
                     "document_id": "doc-1",
+                    "source_id": "source-doc-1",
                     "content_type": "application/vnd.ms-excel",
                 }
             ],
@@ -111,7 +115,7 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             runtime_gateway_client=runtime_gateway,
         )
 
-        files = await service.prepare(
+        prepared = await service.prepare(
             query="Create a report",
             existing_files=[],
             discover_workspace_files=True,
@@ -121,7 +125,7 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             model="test-model",
         )
 
-        self.assertEqual([item.artifact_id for item in files], ["asset-valid"])
+        self.assertEqual([item.artifact_id for item in prepared.files], ["asset-valid"])
         staged = runtime_gateway.stage_report_inputs.await_args.args[1]
         self.assertEqual([item["document_id"] for item in staged], ["doc-valid"])
 
@@ -166,7 +170,7 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             runtime_gateway_client=runtime_gateway,
         )
 
-        files = await service.prepare(
+        prepared = await service.prepare(
             query="hello",
             existing_files=[],
             discover_workspace_files=True,
@@ -176,11 +180,11 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             model="test-model",
         )
 
-        self.assertEqual(files, [])
+        self.assertEqual(prepared.files, [])
         method_hub.call_tool.assert_not_awaited()
         runtime_gateway.stage_report_inputs.assert_not_awaited()
 
-    async def test_explicit_files_skip_discovery_and_metadata_lookup(self) -> None:
+    async def test_primary_execution_file_is_retained_and_related_files_are_appended(self) -> None:
         existing = [
             ExecutionFileRequest(
                 artifact_id="attachment-1",
@@ -188,18 +192,35 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
                 sandbox_path="/workspace/runs/resp-1/inputs/abc-upload.csv",
                 content_type="text/csv",
                 size=10,
+                source_id="source-primary",
+                document_id="document-primary",
+                source_object_key="organizations/test-org/sources/upload.csv",
             )
         ]
         discovery = AsyncMock()
+        discovery.discover.return_value = ["doc-related"]
         method_hub = AsyncMock()
+        method_hub.call_tool.return_value = metadata_result(
+            "doc-related",
+            source_id="source-related",
+        )
         runtime_gateway = AsyncMock()
+        runtime_gateway.stage_report_inputs.return_value = [
+            {
+                "artifact_id": "attachment-related",
+                "filename": "uet.xlsx",
+                "sandbox_path": "/workspace/runs/resp-1/inputs/related-uet.xlsx",
+                "content_type": "application/vnd.ms-excel",
+                "size": 123,
+            }
+        ]
         service = ReportInputPreparationService(
             discovery_agent=discovery,
             method_hub=method_hub,
             runtime_gateway_client=runtime_gateway,
         )
 
-        files = await service.prepare(
+        prepared = await service.prepare(
             query="Create a report",
             existing_files=existing,
             discover_workspace_files=True,
@@ -207,12 +228,20 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             workspace_id="workspace-b",
             runtime_gateway={},
             model="test-model",
+            primary_source_id="source-primary",
         )
 
-        self.assertEqual(files, existing)
-        discovery.discover.assert_not_awaited()
-        method_hub.call_tool.assert_not_awaited()
-        runtime_gateway.stage_report_inputs.assert_not_awaited()
+        self.assertEqual(
+            [item.source_id for item in prepared.files],
+            ["source-primary", "source-related"],
+        )
+        self.assertEqual(
+            [item.role for item in prepared.selected_inputs],
+            ["primary", "related"],
+        )
+        discovery.discover.assert_awaited_once()
+        method_hub.call_tool.assert_awaited_once()
+        runtime_gateway.stage_report_inputs.assert_awaited_once()
 
     async def test_discovery_failures_use_preparation_error_boundary(self) -> None:
         discovery = AsyncMock()
@@ -230,6 +259,127 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(
                 ReportInputPreparationError,
                 "Unable to discover workspace files",
+            ):
+                await service.prepare(
+                    query="Create a report",
+                    existing_files=[],
+                    discover_workspace_files=True,
+                    organization_id="test-org",
+                    workspace_id="workspace-b",
+                    runtime_gateway={"endpoint": "http://runtime", "token": "secret"},
+                    model="test-model",
+                )
+
+    async def test_discovery_failure_retains_existing_primary_file(self) -> None:
+        existing = [
+            ExecutionFileRequest(
+                artifact_id="attachment-1",
+                filename="upload.csv",
+                sandbox_path="/workspace/runs/resp-1/inputs/abc-upload.csv",
+                content_type="text/csv",
+                size=10,
+                source_id="source-primary",
+                document_id="document-primary",
+                source_object_key="organizations/test-org/sources/upload.csv",
+            )
+        ]
+        discovery = AsyncMock()
+        discovery.discover.side_effect = RuntimeError("provider rejected tool choice")
+        method_hub = AsyncMock()
+        runtime_gateway = AsyncMock()
+        service = ReportInputPreparationService(
+            discovery_agent=discovery,
+            method_hub=method_hub,
+            runtime_gateway_client=runtime_gateway,
+        )
+
+        with self.assertLogs(
+            "app.services.report_input_preparation",
+            level="WARNING",
+        ) as logs:
+            prepared = await service.prepare(
+                query="Create a report",
+                existing_files=existing,
+                discover_workspace_files=True,
+                organization_id="test-org",
+                workspace_id="workspace-b",
+                runtime_gateway={"endpoint": "http://runtime", "token": "secret"},
+                model="test-model",
+                primary_source_id="source-primary",
+            )
+
+        self.assertEqual(prepared.files, existing)
+        self.assertEqual([item.role for item in prepared.selected_inputs], ["primary"])
+        self.assertEqual([record.levelno for record in logs.records], [logging.WARNING])
+        method_hub.call_tool.assert_not_awaited()
+        runtime_gateway.stage_report_inputs.assert_not_awaited()
+
+    async def test_no_usable_related_artifacts_retains_existing_primary_file(self) -> None:
+        existing = [
+            ExecutionFileRequest(
+                artifact_id="attachment-1",
+                filename="upload.csv",
+                sandbox_path="/workspace/runs/resp-1/inputs/abc-upload.csv",
+                content_type="text/csv",
+                size=10,
+                source_id="source-primary",
+                document_id="document-primary",
+                source_object_key="organizations/test-org/sources/upload.csv",
+            )
+        ]
+        discovery = AsyncMock()
+        discovery.discover.return_value = ["doc-wrong"]
+        method_hub = AsyncMock()
+        method_hub.call_tool.return_value = metadata_result(
+            "doc-wrong", workspace_id="workspace-a"
+        )
+        runtime_gateway = AsyncMock()
+        service = ReportInputPreparationService(
+            discovery_agent=discovery,
+            method_hub=method_hub,
+            runtime_gateway_client=runtime_gateway,
+        )
+
+        with self.assertLogs(
+            "app.services.report_input_preparation",
+            level="WARNING",
+        ) as logs:
+            prepared = await service.prepare(
+                query="Create a report",
+                existing_files=existing,
+                discover_workspace_files=True,
+                organization_id="test-org",
+                workspace_id="workspace-b",
+                runtime_gateway={"endpoint": "http://runtime", "token": "secret"},
+                model="test-model",
+                primary_source_id="source-primary",
+            )
+
+        self.assertEqual(prepared.files, existing)
+        self.assertEqual([item.role for item in prepared.selected_inputs], ["primary"])
+        self.assertEqual([record.levelno for record in logs.records], [logging.WARNING])
+        runtime_gateway.stage_report_inputs.assert_not_awaited()
+
+    async def test_invalid_staged_payload_uses_preparation_error_boundary(self) -> None:
+        discovery = AsyncMock()
+        discovery.discover.return_value = ["doc-1"]
+        method_hub = AsyncMock()
+        method_hub.call_tool.return_value = metadata_result("doc-1")
+        runtime_gateway = AsyncMock()
+        runtime_gateway.stage_report_inputs.return_value = [{"artifact_id": "asset-1"}]
+        service = ReportInputPreparationService(
+            discovery_agent=discovery,
+            method_hub=method_hub,
+            runtime_gateway_client=runtime_gateway,
+        )
+
+        with self.assertLogs(
+            "app.services.report_input_preparation",
+            level="ERROR",
+        ):
+            with self.assertRaisesRegex(
+                ReportInputPreparationError,
+                "could not be staged",
             ):
                 await service.prepare(
                     query="Create a report",

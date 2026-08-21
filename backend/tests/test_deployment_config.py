@@ -33,10 +33,17 @@ class DeploymentConfigTests(unittest.TestCase):
             "DATABASE_URL",
             "FILE_STORAGE_MODE",
             "CODE_EXECUTION_MODE",
-            "LOCAL_WORKSPACE_ROOT",
             "FRONTEND_URL",
         ):
             self.assertNotIn(legacy, env_example)
+        self.assertIn("LOCAL_MODE", env_example)
+        self.assertIn("LOCAL_WORKSPACE_ROOT", env_example)
+
+    def test_compose_installs_file_utility_for_local_report_tools(self):
+        compose = yaml.safe_load(COMPOSE_PATH.read_text(encoding="utf-8"))
+        command = " ".join(compose["services"]["api"]["command"])
+
+        self.assertIn("apt-get install -y --no-install-recommends file", command)
 
 
 if __name__ == "__main__":

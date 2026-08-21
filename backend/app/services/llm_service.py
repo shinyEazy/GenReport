@@ -9,10 +9,15 @@ from app.core.config import settings
 
 
 class LLMService:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
         self.client = openai.AsyncOpenAI(
-            api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_BASE_URL,
+            api_key=api_key or settings.OPENAI_API_KEY,
+            base_url=base_url or settings.OPENAI_BASE_URL,
         )
         self.default_model = settings.DEFAULT_MODEL
 

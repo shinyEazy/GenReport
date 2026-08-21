@@ -40,12 +40,16 @@ class AxiomToolExecutor:
         input_path: str,
         work_path: str,
         output_path: str,
+        multimodal_image_detail: str = "high",
+        multimodal_image_max_bytes: int = 8 * 1024 * 1024,
     ) -> None:
         self.client = client
         self.files = files
         self.input_path = input_path.rstrip("/")
         self.work_path = work_path.rstrip("/")
         self.output_path = output_path.rstrip("/")
+        self.multimodal_image_detail = multimodal_image_detail
+        self.multimodal_image_max_bytes = max(0, multimodal_image_max_bytes)
         self.todos: list[dict[str, Any]] = []
         self._inputs_by_name = {item.filename: item.sandbox_path for item in files}
 
@@ -95,6 +99,33 @@ class AxiomToolExecutor:
             work_path=self.work_path,
             output_path=self.output_path,
         )
+
+    async def get_multimodal_image_parts(self) -> list[dict[str, Any]]:
+        """Return bounded, declared image inputs in OpenAI message-part form."""
+        image_parts: list[dict[str, Any]] = []
+        for item in self.files:
+            content_type = item.content_type.split(";", 1)[0].strip().lower()
+            if not content_type.startswith("image/"):
+                continue
+            if item.size > self.multimodal_image_max_bytes:
+                continue
+            try:
+                content = await self.client.read_file(item.sandbox_path)
+            except Exception:  # noqa: BLE001, S112 - image inputs are optional.
+                continue
+            if not content or len(content) > self.multimodal_image_max_bytes:
+                continue
+            encoded = base64.b64encode(content).decode("ascii")
+            image_parts.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{content_type};base64,{encoded}",
+                        "detail": self.multimodal_image_detail,
+                    },
+                }
+            )
+        return image_parts
 
     async def execute_tool(
         self, tool_name: str, tool_input: dict[str, Any], **_: Any
@@ -249,6 +280,16 @@ class AxiomToolExecutor:
 
     async def _read_file(self, value: dict[str, Any]) -> dict[str, Any]:
         path, content = await self._read_resolved(str(value.get("path") or ""))
+        if self._is_binary_file(path, content):
+            return {
+                "success": True,
+                "path": path,
+                "output": (
+                    "This binary file cannot be read as text. Image inputs are "
+                    "attached to the report prompt; inspect an attached image "
+                    "directly instead of reading its raw bytes."
+                ),
+            }
         text = content.decode("utf-8", errors="replace")
         return {
             "success": True,
@@ -257,6 +298,21 @@ class AxiomToolExecutor:
             "content_preview": text[:100_000],
             "output": text[:100_000],
         }
+
+    def _is_binary_file(self, path: str, content: bytes) -> bool:
+        content_type = next(
+            (
+                item.content_type.split(";", 1)[0].strip().lower()
+                for item in self.files
+                if item.sandbox_path == path
+            ),
+            mimetypes.guess_type(path)[0] or "",
+        )
+        return (
+            content_type.startswith("image/")
+            or content_type == "application/pdf"
+            or b"\x00" in content
+        )
 
     async def _write_file(self, value: dict[str, Any]) -> dict[str, Any]:
         path = self._write_path(str(value.get("path") or ""))

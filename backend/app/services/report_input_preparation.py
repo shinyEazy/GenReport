@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from app.contracts.report_execution import ExecutionFileRequest
+from app.contracts.report_execution import ExecutionFileRequest, SelectedReportInput
 
 if TYPE_CHECKING:
     from app.services.method_hub_client import MethodHubClient
@@ -25,7 +26,9 @@ class SelectedReportArtifact:
     filename: str
     bucket: str
     document_id: str
+    source_id: str
     content_type: str | None = None
+    source_last_modified: datetime | None = None
 
     def as_dict(self) -> dict[str, str]:
         value = {
@@ -33,9 +36,12 @@ class SelectedReportArtifact:
             "filename": self.filename,
             "bucket": self.bucket,
             "document_id": self.document_id,
+            "source_id": self.source_id,
         }
         if self.content_type:
             value["content_type"] = self.content_type
+        if self.source_last_modified:
+            value["source_last_modified"] = self.source_last_modified.isoformat()
         return value
 
 
@@ -61,9 +67,11 @@ class ReportInputPreparationService:
         workspace_id: str | None,
         runtime_gateway: dict[str, Any] | None,
         model: str | None,
-    ) -> list[ExecutionFileRequest]:
-        if existing_files or not discover_workspace_files:
-            return existing_files
+        primary_source_id: str | None = None,
+    ) -> PreparedReportInputs:
+        files = list(existing_files)
+        if not discover_workspace_files:
+            return _prepared_inputs(files, primary_source_id=primary_source_id)
         if not organization_id or not workspace_id:
             raise ReportInputPreparationError(
                 "Organization and workspace are required for report file discovery"
@@ -77,6 +85,15 @@ class ReportInputPreparationService:
                 model=model,
             )
         except Exception as exc:
+            if files:
+                logger.warning(
+                    "Report file discovery failed organization_id=%s workspace_id=%s; "
+                    "retaining existing report inputs: %s",
+                    organization_id,
+                    workspace_id,
+                    exc,
+                )
+                return _prepared_inputs(files, primary_source_id=primary_source_id)
             logger.exception(
                 "Report file discovery failed organization_id=%s workspace_id=%s",
                 organization_id,
@@ -87,7 +104,7 @@ class ReportInputPreparationService:
             ) from exc
 
         if not document_ids:
-            return existing_files
+            return _prepared_inputs(files, primary_source_id=primary_source_id)
 
         artifacts = await self._resolve_artifacts(
             document_ids=document_ids,
@@ -95,6 +112,14 @@ class ReportInputPreparationService:
             workspace_id=workspace_id,
         )
         if not artifacts:
+            if files:
+                logger.warning(
+                    "No usable related workspace files were selected "
+                    "organization_id=%s workspace_id=%s; retaining existing report inputs",
+                    organization_id,
+                    workspace_id,
+                )
+                return _prepared_inputs(files, primary_source_id=primary_source_id)
             raise ReportInputPreparationError(
                 "No related workspace files were selected for this report"
             )
@@ -104,6 +129,9 @@ class ReportInputPreparationService:
                 runtime_gateway,
                 [item.as_dict() for item in artifacts],
             )
+            related_files = [
+                ExecutionFileRequest.model_validate(item) for item in staged
+            ]
         except Exception as exc:
             logger.exception(
                 "Report input staging failed organization_id=%s workspace_id=%s",
@@ -113,12 +141,19 @@ class ReportInputPreparationService:
             raise ReportInputPreparationError(
                 "The selected workspace files could not be staged for this report"
             ) from exc
-        files = [ExecutionFileRequest.model_validate(item) for item in staged]
-        if not files:
+        if not related_files:
             raise ReportInputPreparationError(
                 "The selected workspace files could not be staged for this report"
             )
-        return files
+        if len(related_files) != len(artifacts):
+            raise ReportInputPreparationError(
+                "The selected workspace files could not be matched to their sources"
+            )
+        files.extend(
+            _with_source_metadata(file, artifact)
+            for file, artifact in zip(related_files, artifacts, strict=True)
+        )
+        return _prepared_inputs(files, primary_source_id=primary_source_id)
 
     async def _resolve_artifacts(
         self,
@@ -172,10 +207,71 @@ class ReportInputPreparationService:
                     filename=filename,
                     bucket=bucket,
                     document_id=document_id,
+                    source_id=_first_string(metadata.get("source_id"), object_key)
+                    or object_key,
                     content_type=_first_string(metadata.get("content_type")),
+                    source_last_modified=_as_datetime(metadata.get("last_modified")),
                 )
             )
         return artifacts
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedReportInputs:
+    files: list[ExecutionFileRequest]
+    selected_inputs: list[SelectedReportInput]
+
+
+def _with_source_metadata(
+    file: ExecutionFileRequest,
+    artifact: SelectedReportArtifact,
+) -> ExecutionFileRequest:
+    return file.model_copy(
+        update={
+            "source_id": artifact.source_id,
+            "document_id": artifact.document_id,
+            "source_object_key": artifact.artifact_id,
+            "source_last_modified": artifact.source_last_modified,
+        }
+    )
+
+
+def _prepared_inputs(
+    files: list[ExecutionFileRequest],
+    *,
+    primary_source_id: str | None,
+) -> PreparedReportInputs:
+    unique_files: list[ExecutionFileRequest] = []
+    seen: set[str] = set()
+    for item in files:
+        identity = item.source_id or item.artifact_id
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique_files.append(item)
+
+    selected_inputs = [
+        SelectedReportInput(
+            source_id=item.source_id or item.artifact_id,
+            document_id=item.document_id,
+            object_key=item.source_object_key or item.artifact_id,
+            filename=item.filename,
+            content_type=item.content_type,
+            role=(
+                "primary"
+                if item.source_id == primary_source_id
+                else "related"
+            ),
+        )
+        for item in unique_files
+    ]
+    if primary_source_id is not None and sum(
+        item.role == "primary" for item in selected_inputs
+    ) != 1:
+        raise ReportInputPreparationError(
+            "primary source must match exactly one selected report input"
+        )
+    return PreparedReportInputs(files=unique_files, selected_inputs=selected_inputs)
 
 
 def _find_document_metadata(
@@ -220,3 +316,14 @@ def _first_string(*values: Any) -> str | None:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
+
+
+def _as_datetime(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
