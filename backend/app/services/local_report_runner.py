@@ -88,18 +88,22 @@ class LocalReportRunner:
         )
 
     async def run(self, config: LocalReportConfig) -> LocalReportResult:
-        return await self._run_traced(config=config)
+        return await self._run_traced(local_config=config)
 
-    async def _run_impl(self, *, config: LocalReportConfig) -> LocalReportResult:
+    async def _run_impl(
+        self,
+        *,
+        local_config: LocalReportConfig,
+    ) -> LocalReportResult:
         if not self.settings.LOCAL_MODE:
             raise LocalReportRunError("Local reports require LOCAL_MODE=true.")
 
-        run_id = config.run_id or f"local-{uuid4().hex}"
+        run_id = local_config.run_id or f"local-{uuid4().hex}"
         workspace = self._prepare_workspace_traced(
-            config=config,
+            local_config=local_config,
             run_id=run_id,
         )
-        files = self._execution_files(workspace, config.files)
+        files = self._execution_files(workspace, local_config.files)
         client = LocalExecutionClient(
             workspace,
             timeout_seconds=self.settings.LOCAL_EXECUTION_TIMEOUT_SECONDS,
@@ -114,7 +118,7 @@ class LocalReportRunner:
         try:
             await self._materialize_assets_traced(executor=executor)
             messages = self._build_messages_traced(
-                config=config,
+                local_config=local_config,
                 workspace=workspace,
                 available_files=executor.get_available_files_prompt(),
             )
@@ -126,7 +130,7 @@ class LocalReportRunner:
                 round_content = ""
                 async for chunk in self._stream_llm_round_traced(
                     messages=messages,
-                    model=config.model,
+                    model=local_config.model,
                     tool_definitions=executor.get_tool_definitions(),
                 ):
                     chunk_type = chunk.get("type")
@@ -200,11 +204,11 @@ class LocalReportRunner:
     def _prepare_workspace_impl(
         self,
         *,
-        config: LocalReportConfig,
+        local_config: LocalReportConfig,
         run_id: str,
     ) -> LocalWorkspace:
         return LocalWorkspace.create(
-            Path(self.settings.LOCAL_WORKSPACE_ROOT), run_id, config.files
+            Path(self.settings.LOCAL_WORKSPACE_ROOT), run_id, local_config.files
         )
 
     @staticmethod
@@ -214,7 +218,7 @@ class LocalReportRunner:
     @staticmethod
     def _build_messages_impl(
         *,
-        config: LocalReportConfig,
+        local_config: LocalReportConfig,
         workspace: LocalWorkspace,
         available_files: str,
     ) -> list[dict[str, str]]:
@@ -222,7 +226,7 @@ class LocalReportRunner:
             {
                 "role": "system",
                 "content": render_system_prompt(
-                    language=config.language,
+                    language=local_config.language,
                     input_path=workspace.virtual_inputs_path,
                     work_path=workspace.virtual_work_path,
                     output_path=workspace.virtual_outputs_path,
@@ -231,7 +235,7 @@ class LocalReportRunner:
             },
             {
                 "role": "user",
-                "content": f"{config.query}",
+                "content": f"{local_config.query}",
             },
         ]
 

@@ -141,6 +141,7 @@ class LocalReportRunnerTests(unittest.IsolatedAsyncioTestCase):
         ).run(self.config)
 
         self.assertEqual(result.output_text, "Report ready.")
+        self.assertEqual(trace_calls[0][3], {"local_config": self.config})
         self.assertEqual(
             [call[0] for call in trace_calls],
             [

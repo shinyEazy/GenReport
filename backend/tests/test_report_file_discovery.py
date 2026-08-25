@@ -52,7 +52,11 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
         async def operation(**kwargs):
             return ["doc-1"]
 
-        with patch.dict(os.environ, {"LANGCHAIN_TRACING_V2": "false"}):
+        with patch.dict(
+            os.environ,
+            {"LANGCHAIN_TRACING_V2": "false"},
+            clear=True,
+        ):
             traced = _trace_discovery_call(operation)
 
         self.assertIs(traced, operation)
