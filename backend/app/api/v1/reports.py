@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from app.contracts.report_execution import ReportExecutionRequest
@@ -14,7 +14,10 @@ from app.services.report_execution import ReportExecutionService
 router = APIRouter()
 
 
-def get_report_execution_service() -> ReportExecutionService:
+def get_report_execution_service(
+    request: Request,
+    report_request: ReportExecutionRequest,
+) -> ReportExecutionService:
     from app.core.config import settings
     from app.services.axiom_execution_client import AxiomExecutionClient
     from app.services.axiom_tool_executor import AxiomToolExecutor
@@ -25,7 +28,12 @@ def get_report_execution_service() -> ReportExecutionService:
     from app.services.runtime_gateway_client import RuntimeGatewayClient
 
     runtime_gateway_client = RuntimeGatewayClient()
-    method_hub = MethodHubClient(settings.METHOD_HUB_MCP_URL)
+    method_hub = MethodHubClient(
+        settings.METHOD_HUB_MCP_URL,
+        authorization=request.headers.get("x-axiom-user-authorization"),
+        trace_id=request.headers.get("x-trace-id"),
+        organization_id=report_request.organization_id,
+    )
     discovery_agent = DiscoveryAgent(
         method_hub=method_hub,
         api_key=settings.OPENAI_API_KEY,

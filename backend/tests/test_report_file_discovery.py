@@ -33,6 +33,21 @@ class FakeMethodHub:
 
 
 class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
+    def test_openrouter_discovery_model_disables_reasoning(self) -> None:
+        with patch("langchain_openai.ChatOpenAI") as chat_openai:
+            agent = DiscoveryAgent(
+                method_hub=FakeMethodHub(),
+                api_key="test-key",
+                base_url="https://openrouter.ai/api/v1",
+            )
+
+            agent._build_model("qwen/qwen3.7-flash")
+
+        self.assertEqual(
+            chat_openai.call_args.kwargs["reasoning"],
+            {"effort": "none"},
+        )
+
     async def test_trace_helper_is_noop_when_langsmith_is_disabled(self) -> None:
         async def operation(**kwargs):
             return ["doc-1"]
@@ -141,7 +156,12 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured["model"], "model:test-model")
         self.assertEqual(captured["response_format"], ReportArtifactSelection)
         self.assertEqual(captured["subagents"], [])
-        self.assertIn("BM25", captured["system_prompt"])
+        self.assertIn("smallest useful set", captured["system_prompt"])
+        self.assertIn("usually 1–3", captured["system_prompt"])
+        self.assertIn("never more than 5", captured["system_prompt"])
+        self.assertIn("exactly one retrieval call", captured["system_prompt"])
+        self.assertIn("do not call a retrieval tool again", captured["system_prompt"])
+        self.assertIn("complementary evidence", captured["system_prompt"])
         self.assertEqual(
             method_hub.calls,
             [
@@ -158,6 +178,64 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         self.assertEqual(compiled.calls[0][1], {"recursion_limit": 17})
+
+    async def test_discovery_blocks_retrieval_after_the_first_call(self) -> None:
+        compiled = FakeCompiledAgent(
+            {
+                "structured_response": ReportArtifactSelection(
+                    document_ids=["doc-1"]
+                )
+            }
+        )
+        captured = {}
+
+        def agent_factory(**kwargs):
+            captured.update(kwargs)
+            return compiled
+
+        agent = DiscoveryAgent(
+            method_hub=FakeMethodHub(),
+            model_factory=lambda model: object(),
+            agent_factory=agent_factory,
+            profile_registrar=lambda model: None,
+            trace_factory=lambda function: function,
+        )
+
+        await agent.discover(
+            query="Create a report",
+            organization_id="test-org",
+            workspace_id="workspace-b",
+        )
+
+        request = type(
+            "Request",
+            (),
+            {
+                "tool_call": {
+                    "id": "call-1",
+                    "name": "corpus_retrieve_context",
+                }
+            },
+        )()
+        handler_calls = 0
+
+        async def handler(_request):
+            nonlocal handler_calls
+            handler_calls += 1
+            return ToolMessage(
+                content="ok",
+                tool_call_id="call-1",
+                name="corpus_retrieve_context",
+            )
+
+        guard = captured["middleware"][0]
+        await guard.awrap_tool_call(request, handler)
+        blocked = await guard.awrap_tool_call(request, handler)
+
+        self.assertEqual(handler_calls, 1)
+        self.assertIsInstance(blocked, ToolMessage)
+        self.assertEqual(blocked.status, "error")
+        self.assertIn("do not call", blocked.content)
 
     async def test_accepts_dict_structured_response_and_enforces_limit(self) -> None:
         compiled = FakeCompiledAgent(

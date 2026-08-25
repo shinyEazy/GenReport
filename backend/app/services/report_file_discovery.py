@@ -5,6 +5,7 @@ import os
 from builtins import BaseExceptionGroup
 from collections.abc import Awaitable, Callable
 from typing import Any
+from urllib.parse import urlparse
 
 from deepagents import (
     GeneralPurposeSubagentProfile,
@@ -26,6 +27,7 @@ REPORT_RETRIEVAL_TOOL_NAMES = {
     "corpus_bm25_search",
     "corpus_get_file_ingested_data",
 }
+MAX_REPORT_RETRIEVAL_TOOL_CALLS = 5
 
 _HIDDEN_DEEP_AGENT_TOOLS = frozenset(
     {
@@ -76,6 +78,42 @@ async def _recover_tool_errors(
             name=tool_call.get("name"),
             status="error",
         )
+
+
+def _limit_retrieval_tool_calls(max_calls: int = MAX_REPORT_RETRIEVAL_TOOL_CALLS):
+    retrieval_calls = 0
+
+    @wrap_tool_call(name="LimitReportRetrievalToolCalls")
+    async def limit_retrieval_tool_calls(
+        request: Any,
+        handler: Callable[[Any], Awaitable[Any]],
+    ) -> Any:
+        nonlocal retrieval_calls
+        tool_call = request.tool_call
+        if tool_call.get("name") not in REPORT_RETRIEVAL_TOOL_NAMES:
+            return await handler(request)
+        if retrieval_calls >= max_calls:
+            return _ToolResult(
+                content=json.dumps(
+                    {
+                        "success": False,
+                        "error_type": "RetrievalLimitExceeded",
+                        "error": "Discovery has already used its one retrieval call.",
+                        "instruction": (
+                            "do not call retrieval tools again. Use the retrieved "
+                            "results and return the structured document_ids selection now."
+                        ),
+                    },
+                    ensure_ascii=False,
+                ),
+                tool_call_id=str(tool_call.get("id", "unknown")),
+                name=tool_call.get("name"),
+                status="error",
+            )
+        retrieval_calls += 1
+        return await handler(request)
+
+    return limit_retrieval_tool_calls
 
 
 def _primary_error(exc: BaseException) -> BaseException:
@@ -165,7 +203,7 @@ class DiscoveryAgent:
         agent = self.agent_factory(
             model=llm,
             tools=tools,
-            middleware=[_recover_tool_errors],
+            middleware=[_limit_retrieval_tool_calls(), _recover_tool_errors],
             system_prompt=_system_prompt(workspace_id),
             subagents=[],
             response_format=ReportArtifactSelection,
@@ -195,12 +233,26 @@ class DiscoveryAgent:
 
         from langchain_openai import ChatOpenAI
 
+        model_config: dict[str, Any] = {
+            "api_key": self.api_key,
+            "base_url": self.base_url or None,
+            "model": model,
+            "temperature": 0,
+        }
+        if _is_openrouter_url(self.base_url):
+            # Discovery uses a structured response, which deepagents implements
+            # with forced tool choice. Alibaba rejects that combination while
+            # Qwen is in thinking mode, so disable reasoning for this call.
+            model_config["reasoning"] = {"effort": "none"}
+
         return ChatOpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url or None,
-            model=model,
-            temperature=0,
+            **model_config,
         )
+
+
+def _is_openrouter_url(base_url: str) -> bool:
+    hostname = (urlparse(base_url).hostname or "").lower()
+    return hostname == "openrouter.ai" or hostname.endswith(".openrouter.ai")
 
 
 def _trace_discovery_call(
@@ -236,11 +288,16 @@ def _deduplicate_document_ids(values: list[str], *, limit: int) -> list[str]:
 
 def _system_prompt(workspace_id: str) -> str:
     return (
-        "Find 1 document_id needed for the requested. "
-        "Use the available corpus retrieval tools. If semantic retrieval fails, "
-        "use BM25 lexical retrieval. Return only document ID supported by tool "
-        "results. "
-        "RETURN 1 DOCUMENT ID ONLY. If request is normal chit chat then no need return. IF FOUND ANY DOCUMENT ID, RETURN 1 DIRECTLY."
+        "Identify the smallest useful set of existing document_ids needed for "
+        "the requested report—usually 1–3 documents and never more than 5. "
+        "You have exactly one retrieval call: use corpus_retrieve_context first. "
+        "After that call returns, do not call a retrieval tool again; use its "
+        "results to select the relevant document ids. Select additional ids only "
+        "when they provide material, complementary evidence; do not add loosely "
+        "related files. Do not inspect full ingested data. "
+        "Return only document ids supported by tool results; never invent ids. "
+        "For normal chit-chat or when no relevant document exists, return an "
+        "empty document_ids list."
     )
 
 

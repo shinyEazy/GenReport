@@ -174,7 +174,7 @@ class ReportInputPreparationService:
                     "corpus_get_file_ingested_data",
                     {
                         "document_id": document_id,
-                        "organization_id": organization_id,
+                        "workspace_id": workspace_id,
                         "mode": "overview",
                         "output_compression": "none",
                     },

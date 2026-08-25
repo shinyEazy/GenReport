@@ -70,7 +70,7 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             "corpus_get_file_ingested_data",
             {
                 "document_id": "doc-1",
-                "organization_id": "test-org",
+                "workspace_id": "workspace-b",
                 "mode": "overview",
                 "output_compression": "none",
             },

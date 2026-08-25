@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from importlib import import_module
 from typing import Any
 
+import httpx
 from langchain_core.tools import BaseTool, StructuredTool
 
 
@@ -17,11 +18,21 @@ class MethodHubTool:
 
 
 class MethodHubClient:
-    def __init__(self, endpoint: str) -> None:
+    def __init__(
+        self,
+        endpoint: str,
+        *,
+        authorization: str | None = None,
+        trace_id: str | None = None,
+        organization_id: str | None = None,
+    ) -> None:
         endpoint = endpoint.strip()
         if not endpoint:
             raise ValueError("Method Hub endpoint is required")
         self.endpoint = endpoint
+        self.authorization = authorization.strip() if authorization else None
+        self.trace_id = trace_id.strip() if trace_id else None
+        self.organization_id = organization_id.strip() if organization_id else None
 
     async def list_tools(self) -> list[MethodHubTool]:
         async with self._session() as session:
@@ -100,13 +111,31 @@ class MethodHubClient:
         @asynccontextmanager
         async def session_context():
             ClientSession, streamable_http_client = _load_mcp_client()
-            async with streamable_http_client(self.endpoint) as streams:
-                read_stream, write_stream = streams[:2]
-                async with ClientSession(read_stream, write_stream) as session:
-                    await session.initialize()
-                    yield session
+            async with httpx.AsyncClient(
+                headers=self._request_headers(),
+                follow_redirects=True,
+                timeout=httpx.Timeout(30.0, read=300.0),
+            ) as client:
+                async with streamable_http_client(
+                    self.endpoint,
+                    http_client=client,
+                ) as streams:
+                    read_stream, write_stream = streams[:2]
+                    async with ClientSession(read_stream, write_stream) as session:
+                        await session.initialize()
+                        yield session
 
         return session_context()
+
+    def _request_headers(self) -> dict[str, str]:
+        headers: dict[str, str] = {}
+        if self.authorization:
+            headers["Authorization"] = self.authorization
+        if self.trace_id:
+            headers["X-Trace-ID"] = self.trace_id
+        if self.organization_id:
+            headers["X-Org-ID"] = self.organization_id
+        return headers
 
     @staticmethod
     def _normalize_tool(value: Any) -> MethodHubTool:

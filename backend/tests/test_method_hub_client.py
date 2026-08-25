@@ -1,6 +1,7 @@
 import sys
 import types
 import unittest
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, patch
 
 from app.services import method_hub_client
@@ -31,6 +32,62 @@ class MethodHubClientCompatibilityTests(unittest.TestCase):
 
 
 class MethodHubLangChainToolTests(unittest.IsolatedAsyncioTestCase):
+    async def test_session_keeps_sse_stream_open_for_slow_tool_results(self) -> None:
+        class FakeSession:
+            def __init__(self, *_args) -> None:
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args) -> None:
+                return None
+
+            async def initialize(self) -> None:
+                return None
+
+        @asynccontextmanager
+        async def fake_streamable_http_client(*_args, **_kwargs):
+            yield object(), object()
+
+        created_clients = []
+        real_async_client = method_hub_client.httpx.AsyncClient
+
+        def record_client(*args, **kwargs):
+            client = real_async_client(*args, **kwargs)
+            created_clients.append(client)
+            return client
+
+        client = method_hub_client.MethodHubClient("http://method-hub.test/mcp")
+        with (
+            patch.object(method_hub_client, "_load_mcp_client", return_value=(FakeSession, fake_streamable_http_client)),
+            patch.object(method_hub_client.httpx, "AsyncClient", side_effect=record_client),
+        ):
+            async with client._session():
+                pass
+
+        self.assertEqual(created_clients[0].timeout.connect, 30.0)
+        self.assertEqual(created_clients[0].timeout.read, 300.0)
+        self.assertTrue(created_clients[0].follow_redirects)
+        await created_clients[0].aclose()
+
+    def test_request_headers_forward_user_context(self) -> None:
+        client = method_hub_client.MethodHubClient(
+            "http://method-hub.test/mcp",
+            authorization="Bearer user-token",
+            trace_id="trace-1",
+            organization_id="org-1",
+        )
+
+        self.assertEqual(
+            client._request_headers(),
+            {
+                "Authorization": "Bearer user-token",
+                "X-Trace-ID": "trace-1",
+                "X-Org-ID": "org-1",
+            },
+        )
+
     async def test_langchain_tool_injects_supported_request_scope(self) -> None:
         client = method_hub_client.MethodHubClient("http://method-hub.test/mcp")
         client.list_tools = AsyncMock(

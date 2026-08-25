@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     MAX_AGENT_ITERATIONS: int = Field(default=100, ge=1, le=100)
     METHOD_HUB_MCP_URL: str = "http://host.docker.internal:38000/mcp"
     REPORT_DISCOVERY_MAX_ARTIFACTS: int = Field(default=20, ge=1, le=100)
-    REPORT_DISCOVERY_MAX_ROUNDS: int = Field(default=20, ge=1, le=100)
+    REPORT_DISCOVERY_MAX_ROUNDS: int = Field(default=25, ge=1, le=100)
     LOCAL_MODE: bool = False
     LOCAL_WORKSPACE_ROOT: Path = BACKEND_DIR / "data" / "workspaces"
     LOCAL_EXECUTION_TIMEOUT_SECONDS: int = Field(default=120, ge=1, le=3600)
