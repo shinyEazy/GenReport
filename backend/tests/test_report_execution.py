@@ -243,7 +243,7 @@ def recording_trace_operation(calls):
 
 
 class ReportExecutionTests(unittest.IsolatedAsyncioTestCase):
-    async def test_remote_workflow_traces_root_and_each_report_stage(self):
+    async def test_remote_workflow_traces_only_model_and_tool_rounds(self):
         trace_calls = []
         events = await collect(
             make_service(
@@ -259,13 +259,9 @@ class ReportExecutionTests(unittest.IsolatedAsyncioTestCase):
             [call[0] for call in trace_calls],
             [
                 "genreport-report-workflow",
-                "report-input-preparation",
-                "report-asset-materialization",
-                "report-prompt-construction",
-                "report-llm-round",
-                "report-tool-execution",
-                "report-llm-round",
-                "report-artifact-finalization",
+                "model",
+                "tools",
+                "model",
             ],
         )
 

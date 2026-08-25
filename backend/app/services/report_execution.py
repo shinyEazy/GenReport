@@ -87,92 +87,85 @@ class ReportExecutionService:
             run_type="chain",
             tags=list(REMOTE_WORKFLOW_TAGS),
         )
-        self._prepare_inputs_traced = trace_operation(
-            self._prepare_inputs_impl,
-            name="report-input-preparation",
-            run_type="chain",
-            tags=[*REMOTE_WORKFLOW_TAGS, "preparation"],
-        )
-        self._materialize_assets_traced = trace_operation(
-            self._materialize_assets_impl,
-            name="report-asset-materialization",
-            run_type="chain",
-            tags=[*REMOTE_WORKFLOW_TAGS, "materialization"],
-        )
-        self._build_messages_traced = trace_operation(
-            self._build_messages_impl,
-            name="report-prompt-construction",
-            run_type="chain",
-            tags=[*REMOTE_WORKFLOW_TAGS, "prompt"],
-        )
         self._stream_llm_round_traced = trace_operation(
             self._stream_llm_round_impl,
-            name="report-llm-round",
+            name="model",
             run_type="llm",
-            tags=[*REMOTE_WORKFLOW_TAGS, "llm"],
+            tags=[*REMOTE_WORKFLOW_TAGS, "model"],
         )
         self._execute_tool_traced = trace_operation(
             self._execute_tool_impl,
-            name="report-tool-execution",
+            name="tools",
             run_type="tool",
-            tags=[*REMOTE_WORKFLOW_TAGS, "tool"],
-        )
-        self._finalize_artifacts_traced = trace_operation(
-            self._finalize_artifacts_impl,
-            name="report-artifact-finalization",
-            run_type="chain",
-            tags=[*REMOTE_WORKFLOW_TAGS, "artifact"],
+            tags=[*REMOTE_WORKFLOW_TAGS, "tools"],
         )
 
     async def stream(
         self,
         request: ReportExecutionRequest,
     ) -> AsyncIterator[ReportEvent]:
-        async for event in self._stream_traced(request=request):
+        event_factory = self.event_factory_builder(request)
+        yield event_factory.create(
+            "report.status",
+            {"phase": "preparing", "message": "Preparing report execution."},
+        )
+        try:
+            prepared_inputs = await self._prepare_inputs_impl(request=request)
+        except ReportInputPreparationError as exc:
+            failure = ReportFailure(
+                code="report_input_preparation_failed",
+                phase="discovery",
+                message=str(exc),
+                retryable=True,
+            )
+            yield event_factory.create(
+                "report.failed",
+                failure.model_dump(mode="json"),
+            )
+            return
+        except Exception as exc:
+            failure = self._unexpected_failure(exc)
+            yield event_factory.create(
+                "report.failed",
+                failure.model_dump(mode="json"),
+            )
+            return
+
+        effective_request = request.model_copy(
+            update={"execution_files": prepared_inputs.files}
+        )
+        async for event in self._stream_traced(
+            request=effective_request,
+            selected_inputs=prepared_inputs.selected_inputs,
+        ):
             yield event
 
     async def _stream_impl(
         self,
         *,
         request: ReportExecutionRequest,
+        selected_inputs: list[Any],
     ) -> AsyncIterator[ReportEvent]:
         event_factory = self.event_factory_builder(request)
         executor: AxiomToolExecutor | None = None
         try:
-            yield event_factory.create(
-                "report.status",
-                {"phase": "preparing", "message": "Preparing report execution."},
-            )
-            try:
-                prepared_inputs = await self._prepare_inputs_traced(request=request)
-            except ReportInputPreparationError as exc:
-                raise _ReportPhaseError(
-                    code="report_input_preparation_failed",
-                    phase="discovery",
-                    message=str(exc),
-                    retryable=True,
-                ) from exc
-
-            effective_request = request.model_copy(
-                update={"execution_files": prepared_inputs.files}
-            )
-            executor = self.executor_factory(effective_request)
-            await self._materialize_assets_traced(executor=executor)
+            executor = self.executor_factory(request)
+            await executor.materialize_assets()
             yield event_factory.create(
                 "report.inputs.selected",
                 ReportInputsSelected(
-                    inputs=prepared_inputs.selected_inputs
+                    inputs=selected_inputs
                 ).model_dump(mode="json"),
             )
             selected_model = (
-                effective_request.model
+                request.model
                 or getattr(self.llm_service, "default_model", "")
             )
             image_parts: list[dict[str, Any]] | None = None
             if self._is_multimodal_model(selected_model):
                 image_parts = await executor.get_multimodal_image_parts()
-            messages = self._build_messages_traced(
-                request=effective_request,
+            messages = build_report_messages(
+                request,
                 available_files=executor.get_available_files_prompt(),
                 image_parts=image_parts,
             )
@@ -193,7 +186,7 @@ class ReportExecutionService:
                 try:
                     async for chunk in self._stream_llm_round_traced(
                         messages=messages,
-                        model=effective_request.model,
+                        model=request.model,
                         tool_definitions=executor.get_tool_definitions(),
                     ):
                         chunk_type = chunk.get("type")
@@ -256,7 +249,7 @@ class ReportExecutionService:
                 for tool_call in tool_calls:
                     name, arguments = self._parse_tool_call(tool_call)
                     tool_call_id = str(tool_call.get("id") or "tool")
-                    gateway = effective_request.runtime_gateway.model_dump(mode="json")
+                    gateway = request.runtime_gateway.model_dump(mode="json")
                     started_payload = {
                         "tool_call_id": tool_call_id,
                         "tool_name": name,
@@ -356,17 +349,16 @@ class ReportExecutionService:
 
             output_text = "".join(output_parts)
             usage = self._build_usage(
-                request=effective_request,
+                request=request,
                 messages=messages,
                 output_text=output_text,
                 totals=usage_totals,
                 provider_usage_seen=provider_usage_seen,
             )
             try:
-                artifacts = await self._finalize_artifacts_traced(
-                    executor=executor,
-                    generated_files=generated_files,
-                    workspace_id=effective_request.workspace_id,
+                artifacts = await executor.finalize_generated_files(
+                    generated_files,
+                    workspace_id=request.workspace_id,
                 )
                 completion = ReportCompletion(
                     output_text=output_text,
@@ -428,23 +420,6 @@ class ReportExecutionService:
             primary_source_id=request.primary_source_id,
         )
 
-    @staticmethod
-    async def _materialize_assets_impl(*, executor: AxiomToolExecutor) -> None:
-        await executor.materialize_assets()
-
-    @staticmethod
-    def _build_messages_impl(
-        *,
-        request: ReportExecutionRequest,
-        available_files: str,
-        image_parts: list[dict[str, Any]] | None,
-    ) -> list[dict[str, Any]]:
-        return build_report_messages(
-            request,
-            available_files=available_files,
-            image_parts=image_parts,
-        )
-
     async def _stream_llm_round_impl(
         self,
         *,
@@ -467,18 +442,6 @@ class ReportExecutionService:
         arguments: dict[str, Any],
     ) -> dict[str, Any]:
         return await executor.execute_tool(name, arguments)
-
-    @staticmethod
-    async def _finalize_artifacts_impl(
-        *,
-        executor: AxiomToolExecutor,
-        generated_files: list[dict[str, Any]],
-        workspace_id: str | None,
-    ) -> list[dict[str, Any]]:
-        return await executor.finalize_generated_files(
-            generated_files,
-            workspace_id=workspace_id,
-        )
 
     @staticmethod
     def _parse_tool_call(tool_call: dict[str, Any]) -> tuple[str, dict[str, Any]]:
