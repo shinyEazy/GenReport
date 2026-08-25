@@ -80,6 +80,23 @@ cp backend/.env.example backend/.env
 
 Set the model credentials and optional Method Hub endpoint.
 
+### LangSmith tracing
+
+To trace both the streaming API workflow and local CLI runs, configure the
+LangSmith credentials and enable tracing:
+
+```bash
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=your-langsmith-api-key
+LANGCHAIN_PROJECT=gen-report
+```
+
+`LANGCHAIN_TRACING_V2=true` is also supported for existing deployments. Each
+run has a `genreport-report-workflow` root trace with child traces for input or
+workspace preparation, asset materialization, prompt construction, every LLM
+round, tool call, and artifact finalization. Inputs and outputs are preserved in
+the trace, so restrict LangSmith project access appropriately.
+
 ### Local CLI mode
 
 For a host-local report run, set `LOCAL_MODE=true` in `backend/.env`, then

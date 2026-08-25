@@ -21,7 +21,10 @@ from app.services.report_input_preparation import (
     ReportInputPreparationService,
 )
 from app.services.report_prompt import build_report_messages
-from app.services.report_tracing import trace_operation as default_trace_operation
+from app.services.report_tracing import (
+    REMOTE_WORKFLOW_TAGS,
+    trace_operation as default_trace_operation,
+)
 from app.services.runtime_gateway_client import RuntimeGatewayClient
 
 
@@ -82,43 +85,43 @@ class ReportExecutionService:
             self._stream_impl,
             name="genreport-report-workflow",
             run_type="chain",
-            tags=["genreport", "report-workflow", "remote"],
+            tags=list(REMOTE_WORKFLOW_TAGS),
         )
         self._prepare_inputs_traced = trace_operation(
             self._prepare_inputs_impl,
             name="report-input-preparation",
             run_type="chain",
-            tags=["genreport", "report-workflow", "remote", "preparation"],
+            tags=[*REMOTE_WORKFLOW_TAGS, "preparation"],
         )
         self._materialize_assets_traced = trace_operation(
             self._materialize_assets_impl,
             name="report-asset-materialization",
             run_type="chain",
-            tags=["genreport", "report-workflow", "remote", "materialization"],
+            tags=[*REMOTE_WORKFLOW_TAGS, "materialization"],
         )
         self._build_messages_traced = trace_operation(
             self._build_messages_impl,
             name="report-prompt-construction",
             run_type="chain",
-            tags=["genreport", "report-workflow", "remote", "prompt"],
+            tags=[*REMOTE_WORKFLOW_TAGS, "prompt"],
         )
         self._stream_llm_round_traced = trace_operation(
             self._stream_llm_round_impl,
             name="report-llm-round",
             run_type="llm",
-            tags=["genreport", "report-workflow", "remote", "llm"],
+            tags=[*REMOTE_WORKFLOW_TAGS, "llm"],
         )
         self._execute_tool_traced = trace_operation(
             self._execute_tool_impl,
             name="report-tool-execution",
             run_type="tool",
-            tags=["genreport", "report-workflow", "remote", "tool"],
+            tags=[*REMOTE_WORKFLOW_TAGS, "tool"],
         )
         self._finalize_artifacts_traced = trace_operation(
             self._finalize_artifacts_impl,
             name="report-artifact-finalization",
             run_type="chain",
-            tags=["genreport", "report-workflow", "remote", "artifact"],
+            tags=[*REMOTE_WORKFLOW_TAGS, "artifact"],
         )
 
     async def stream(

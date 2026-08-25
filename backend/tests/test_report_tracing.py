@@ -4,10 +4,24 @@ import os
 import unittest
 from unittest.mock import patch
 
-from app.services.report_tracing import trace_operation
+from app.services.report_tracing import (
+    LOCAL_WORKFLOW_TAGS,
+    REMOTE_WORKFLOW_TAGS,
+    trace_operation,
+)
 
 
 class ReportTracingTests(unittest.TestCase):
+    def test_workflow_tags_identify_remote_and_local_execution(self) -> None:
+        self.assertEqual(
+            REMOTE_WORKFLOW_TAGS,
+            ("genreport", "report-workflow", "remote"),
+        )
+        self.assertEqual(
+            LOCAL_WORKFLOW_TAGS,
+            ("genreport", "report-workflow", "local"),
+        )
+
     def test_returns_original_function_when_tracing_is_disabled(self) -> None:
         def operation(value):
             return value

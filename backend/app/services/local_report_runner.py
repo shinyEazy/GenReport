@@ -14,7 +14,10 @@ from app.services.axiom_tool_executor import AxiomToolExecutor
 from app.services.local_execution_client import LocalExecutionClient
 from app.services.local_workspace import LocalWorkspace
 from app.services.report_prompt import render_system_prompt
-from app.services.report_tracing import trace_operation as default_trace_operation
+from app.services.report_tracing import (
+    LOCAL_WORKFLOW_TAGS,
+    trace_operation as default_trace_operation,
+)
 
 
 TraceOperation = Callable[..., Callable[..., Any]]
@@ -45,43 +48,43 @@ class LocalReportRunner:
             self._run_impl,
             name="genreport-report-workflow",
             run_type="chain",
-            tags=["genreport", "report-workflow", "local"],
+            tags=list(LOCAL_WORKFLOW_TAGS),
         )
         self._prepare_workspace_traced = trace_operation(
             self._prepare_workspace_impl,
             name="report-workspace-preparation",
             run_type="chain",
-            tags=["genreport", "report-workflow", "local", "workspace"],
+            tags=[*LOCAL_WORKFLOW_TAGS, "workspace"],
         )
         self._materialize_assets_traced = trace_operation(
             self._materialize_assets_impl,
             name="report-asset-materialization",
             run_type="chain",
-            tags=["genreport", "report-workflow", "local", "materialization"],
+            tags=[*LOCAL_WORKFLOW_TAGS, "materialization"],
         )
         self._build_messages_traced = trace_operation(
             self._build_messages_impl,
             name="report-prompt-construction",
             run_type="chain",
-            tags=["genreport", "report-workflow", "local", "prompt"],
+            tags=[*LOCAL_WORKFLOW_TAGS, "prompt"],
         )
         self._stream_llm_round_traced = trace_operation(
             self._stream_llm_round_impl,
             name="report-llm-round",
             run_type="llm",
-            tags=["genreport", "report-workflow", "local", "llm"],
+            tags=[*LOCAL_WORKFLOW_TAGS, "llm"],
         )
         self._execute_tool_traced = trace_operation(
             self._execute_tool_impl,
             name="report-tool-execution",
             run_type="tool",
-            tags=["genreport", "report-workflow", "local", "tool"],
+            tags=[*LOCAL_WORKFLOW_TAGS, "tool"],
         )
         self._finalize_artifacts_traced = trace_operation(
             self._finalize_artifacts_impl,
             name="report-artifact-finalization",
             run_type="chain",
-            tags=["genreport", "report-workflow", "local", "artifact"],
+            tags=[*LOCAL_WORKFLOW_TAGS, "artifact"],
         )
 
     async def run(self, config: LocalReportConfig) -> LocalReportResult:
