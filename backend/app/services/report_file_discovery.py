@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from builtins import BaseExceptionGroup
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -19,6 +18,7 @@ from langchain_core.messages import ToolMessage as _ToolResult
 from pydantic import BaseModel, Field
 
 from app.services.method_hub_client import MethodHubClient
+from app.services.report_tracing import trace_operation
 
 
 REPORT_RETRIEVAL_TOOL_NAMES = {
@@ -258,18 +258,12 @@ def _is_openrouter_url(base_url: str) -> bool:
 def _trace_discovery_call(
     function: Callable[..., Awaitable[list[str]]],
 ) -> Callable[..., Awaitable[list[str]]]:
-    if os.getenv("LANGCHAIN_TRACING_V2", "").strip().lower() != "true":
-        return function
-    try:
-        from langsmith import traceable
-    except ImportError:
-        return function
-    return traceable(
-        name="genreport-file-discovery",
+    return trace_operation(
+        function,
+        name="file-discovery",
         run_type="chain",
-        project_name=os.getenv("LANGCHAIN_PROJECT") or "gen-report",
         tags=["genreport", "file-discovery"],
-    )(function)
+    )
 
 
 def _deduplicate_document_ids(values: list[str], *, limit: int) -> list[str]:

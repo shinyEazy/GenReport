@@ -57,21 +57,20 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(traced, operation)
 
-    @patch("langsmith.traceable")
-    async def test_trace_helper_configures_named_chain_run(self, traceable) -> None:
+    @patch("app.services.report_file_discovery.trace_operation")
+    def test_trace_helper_delegates_to_shared_trace_operation(self, trace_operation) -> None:
         async def operation(**kwargs):
             return ["doc-1"]
 
         decorated = object()
-        traceable.return_value.return_value = decorated
-        with patch.dict(os.environ, {"LANGCHAIN_TRACING_V2": "true"}):
-            traced = _trace_discovery_call(operation)
+        trace_operation.return_value = decorated
+        traced = _trace_discovery_call(operation)
 
         self.assertIs(traced, decorated)
-        traceable.assert_called_once_with(
-            name="genreport-file-discovery",
+        trace_operation.assert_called_once_with(
+            operation,
+            name="file-discovery",
             run_type="chain",
-            project_name=os.getenv("LANGCHAIN_PROJECT") or "gen-report",
             tags=["genreport", "file-discovery"],
         )
 
