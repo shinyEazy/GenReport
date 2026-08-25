@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,10 @@ from app.services.axiom_tool_executor import AxiomToolExecutor
 from app.services.local_execution_client import LocalExecutionClient
 from app.services.local_workspace import LocalWorkspace
 from app.services.report_prompt import render_system_prompt
+from app.services.report_tracing import trace_operation as default_trace_operation
+
+
+TraceOperation = Callable[..., Callable[..., Any]]
 
 
 class LocalReportRunError(RuntimeError):
@@ -27,17 +32,69 @@ class LocalReportResult:
 
 
 class LocalReportRunner:
-    def __init__(self, *, settings: Any, llm_service: Any) -> None:
+    def __init__(
+        self,
+        *,
+        settings: Any,
+        llm_service: Any,
+        trace_operation: TraceOperation = default_trace_operation,
+    ) -> None:
         self.settings = settings
         self.llm_service = llm_service
+        self._run_traced = trace_operation(
+            self._run_impl,
+            name="genreport-report-workflow",
+            run_type="chain",
+            tags=["genreport", "report-workflow", "local"],
+        )
+        self._prepare_workspace_traced = trace_operation(
+            self._prepare_workspace_impl,
+            name="report-workspace-preparation",
+            run_type="chain",
+            tags=["genreport", "report-workflow", "local", "workspace"],
+        )
+        self._materialize_assets_traced = trace_operation(
+            self._materialize_assets_impl,
+            name="report-asset-materialization",
+            run_type="chain",
+            tags=["genreport", "report-workflow", "local", "materialization"],
+        )
+        self._build_messages_traced = trace_operation(
+            self._build_messages_impl,
+            name="report-prompt-construction",
+            run_type="chain",
+            tags=["genreport", "report-workflow", "local", "prompt"],
+        )
+        self._stream_llm_round_traced = trace_operation(
+            self._stream_llm_round_impl,
+            name="report-llm-round",
+            run_type="llm",
+            tags=["genreport", "report-workflow", "local", "llm"],
+        )
+        self._execute_tool_traced = trace_operation(
+            self._execute_tool_impl,
+            name="report-tool-execution",
+            run_type="tool",
+            tags=["genreport", "report-workflow", "local", "tool"],
+        )
+        self._finalize_artifacts_traced = trace_operation(
+            self._finalize_artifacts_impl,
+            name="report-artifact-finalization",
+            run_type="chain",
+            tags=["genreport", "report-workflow", "local", "artifact"],
+        )
 
     async def run(self, config: LocalReportConfig) -> LocalReportResult:
+        return await self._run_traced(config=config)
+
+    async def _run_impl(self, *, config: LocalReportConfig) -> LocalReportResult:
         if not self.settings.LOCAL_MODE:
             raise LocalReportRunError("Local reports require LOCAL_MODE=true.")
 
         run_id = config.run_id or f"local-{uuid4().hex}"
-        workspace = LocalWorkspace.create(
-            Path(self.settings.LOCAL_WORKSPACE_ROOT), run_id, config.files
+        workspace = self._prepare_workspace_traced(
+            config=config,
+            run_id=run_id,
         )
         files = self._execution_files(workspace, config.files)
         client = LocalExecutionClient(
@@ -52,31 +109,20 @@ class LocalReportRunner:
             output_path=workspace.virtual_outputs_path,
         )
         try:
-            await executor.materialize_assets()
-            messages = [
-                {
-                    "role": "system",
-                    "content": render_system_prompt(
-                        language=config.language,
-                        input_path=workspace.virtual_inputs_path,
-                        work_path=workspace.virtual_work_path,
-                        output_path=workspace.virtual_outputs_path,
-                        available_files=executor.get_available_files_prompt(),
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"{config.query}",
-                },
-            ]
+            await self._materialize_assets_traced(executor=executor)
+            messages = self._build_messages_traced(
+                config=config,
+                workspace=workspace,
+                available_files=executor.get_available_files_prompt(),
+            )
             generated_files: list[dict[str, Any]] = []
             output_parts: list[str] = []
 
             for _ in range(self.settings.MAX_AGENT_ITERATIONS):
                 tool_calls: list[dict[str, Any]] = []
                 round_content = ""
-                async for chunk in self.llm_service.stream_chat(
-                    messages,
+                async for chunk in self._stream_llm_round_traced(
+                    messages=messages,
                     model=config.model,
                     tool_definitions=executor.get_tool_definitions(),
                 ):
@@ -103,7 +149,10 @@ class LocalReportRunner:
                         raise LocalReportRunError(str(chunk.get("content") or "Model failed."))
 
                 if not tool_calls:
-                    artifacts = await executor.finalize_generated_files(generated_files)
+                    artifacts = await self._finalize_artifacts_traced(
+                        executor=executor,
+                        generated_files=generated_files,
+                    )
                     return LocalReportResult(
                         workspace=workspace,
                         output_text="".join(output_parts),
@@ -119,7 +168,11 @@ class LocalReportRunner:
                 )
                 for tool_call in tool_calls:
                     name, arguments = self._parse_tool_call(tool_call)
-                    result = await executor.execute_tool(name, arguments)
+                    result = await self._execute_tool_traced(
+                        executor=executor,
+                        name=name,
+                        arguments=arguments,
+                    )
                     generated = result.get("generated_files")
                     if isinstance(generated, list):
                         generated_files.extend(
@@ -140,6 +193,75 @@ class LocalReportRunner:
             raise LocalReportRunError(str(exc)) from exc
         finally:
             await executor.close()
+
+    def _prepare_workspace_impl(
+        self,
+        *,
+        config: LocalReportConfig,
+        run_id: str,
+    ) -> LocalWorkspace:
+        return LocalWorkspace.create(
+            Path(self.settings.LOCAL_WORKSPACE_ROOT), run_id, config.files
+        )
+
+    @staticmethod
+    async def _materialize_assets_impl(*, executor: AxiomToolExecutor) -> None:
+        await executor.materialize_assets()
+
+    @staticmethod
+    def _build_messages_impl(
+        *,
+        config: LocalReportConfig,
+        workspace: LocalWorkspace,
+        available_files: str,
+    ) -> list[dict[str, str]]:
+        return [
+            {
+                "role": "system",
+                "content": render_system_prompt(
+                    language=config.language,
+                    input_path=workspace.virtual_inputs_path,
+                    work_path=workspace.virtual_work_path,
+                    output_path=workspace.virtual_outputs_path,
+                    available_files=available_files,
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"{config.query}",
+            },
+        ]
+
+    async def _stream_llm_round_impl(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        model: str | None,
+        tool_definitions: list[dict[str, Any]],
+    ) -> AsyncIterator[dict[str, Any]]:
+        async for chunk in self.llm_service.stream_chat(
+            messages,
+            model=model,
+            tool_definitions=tool_definitions,
+        ):
+            yield chunk
+
+    @staticmethod
+    async def _execute_tool_impl(
+        *,
+        executor: AxiomToolExecutor,
+        name: str,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
+        return await executor.execute_tool(name, arguments)
+
+    @staticmethod
+    async def _finalize_artifacts_impl(
+        *,
+        executor: AxiomToolExecutor,
+        generated_files: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        return await executor.finalize_generated_files(generated_files)
 
     @staticmethod
     def _execution_files(

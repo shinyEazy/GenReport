@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,6 +8,31 @@ from types import SimpleNamespace
 
 from app.contracts.local_report import LocalReportConfig
 from app.services.local_report_runner import LocalReportRunError, LocalReportRunner
+
+
+def recording_trace_operation(calls):
+    def trace_operation(function, *, name, run_type="chain", tags=None):
+        if inspect.isasyncgenfunction(function):
+            async def traced(*args, **kwargs):
+                calls.append((name, run_type, tags, kwargs))
+                async for item in function(*args, **kwargs):
+                    yield item
+
+            return traced
+        if inspect.iscoroutinefunction(function):
+            async def traced(*args, **kwargs):
+                calls.append((name, run_type, tags, kwargs))
+                return await function(*args, **kwargs)
+
+            return traced
+
+        def traced(*args, **kwargs):
+            calls.append((name, run_type, tags, kwargs))
+            return function(*args, **kwargs)
+
+        return traced
+
+    return trace_operation
 
 
 class ToolCallingLLM:
@@ -104,6 +130,30 @@ class LocalReportRunnerTests(unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self) -> None:
         self.temp_dir.cleanup()
+
+    async def test_local_workflow_traces_root_and_each_report_stage(self) -> None:
+        trace_calls = []
+
+        result = await LocalReportRunner(
+            settings=self.settings,
+            llm_service=ToolCallingLLM(),
+            trace_operation=recording_trace_operation(trace_calls),
+        ).run(self.config)
+
+        self.assertEqual(result.output_text, "Report ready.")
+        self.assertEqual(
+            [call[0] for call in trace_calls],
+            [
+                "genreport-report-workflow",
+                "report-workspace-preparation",
+                "report-asset-materialization",
+                "report-prompt-construction",
+                "report-llm-round",
+                "report-tool-execution",
+                "report-llm-round",
+                "report-artifact-finalization",
+            ],
+        )
 
     async def test_runs_tools_and_finalizes_local_artifacts(self) -> None:
         llm = ToolCallingLLM()
