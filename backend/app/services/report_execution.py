@@ -21,6 +21,7 @@ from app.services.report_input_preparation import (
     ReportInputPreparationService,
 )
 from app.services.report_prompt import build_report_messages
+from app.services.report_tracing import trace_operation as default_trace_operation
 from app.services.runtime_gateway_client import RuntimeGatewayClient
 
 
@@ -34,6 +35,7 @@ FailurePhase = Literal[
     "cancellation",
     "internal",
 ]
+TraceOperation = Callable[..., Callable[..., Any]]
 
 
 class _ReportPhaseError(RuntimeError):
@@ -63,6 +65,7 @@ class ReportExecutionService:
         max_iterations: int,
         runtime_gateway_client: RuntimeGatewayClient | None = None,
         multimodal_models: list[str] | tuple[str, ...] = (),
+        trace_operation: TraceOperation = default_trace_operation,
     ) -> None:
         self.llm_service = llm_service
         self.input_preparer = input_preparer
@@ -75,9 +78,59 @@ class ReportExecutionService:
             for model in multimodal_models
             if model.strip()
         }
+        self._stream_traced = trace_operation(
+            self._stream_impl,
+            name="genreport-report-workflow",
+            run_type="chain",
+            tags=["genreport", "report-workflow", "remote"],
+        )
+        self._prepare_inputs_traced = trace_operation(
+            self._prepare_inputs_impl,
+            name="report-input-preparation",
+            run_type="chain",
+            tags=["genreport", "report-workflow", "remote", "preparation"],
+        )
+        self._materialize_assets_traced = trace_operation(
+            self._materialize_assets_impl,
+            name="report-asset-materialization",
+            run_type="chain",
+            tags=["genreport", "report-workflow", "remote", "materialization"],
+        )
+        self._build_messages_traced = trace_operation(
+            self._build_messages_impl,
+            name="report-prompt-construction",
+            run_type="chain",
+            tags=["genreport", "report-workflow", "remote", "prompt"],
+        )
+        self._stream_llm_round_traced = trace_operation(
+            self._stream_llm_round_impl,
+            name="report-llm-round",
+            run_type="llm",
+            tags=["genreport", "report-workflow", "remote", "llm"],
+        )
+        self._execute_tool_traced = trace_operation(
+            self._execute_tool_impl,
+            name="report-tool-execution",
+            run_type="tool",
+            tags=["genreport", "report-workflow", "remote", "tool"],
+        )
+        self._finalize_artifacts_traced = trace_operation(
+            self._finalize_artifacts_impl,
+            name="report-artifact-finalization",
+            run_type="chain",
+            tags=["genreport", "report-workflow", "remote", "artifact"],
+        )
 
     async def stream(
         self,
+        request: ReportExecutionRequest,
+    ) -> AsyncIterator[ReportEvent]:
+        async for event in self._stream_traced(request=request):
+            yield event
+
+    async def _stream_impl(
+        self,
+        *,
         request: ReportExecutionRequest,
     ) -> AsyncIterator[ReportEvent]:
         event_factory = self.event_factory_builder(request)
@@ -88,17 +141,7 @@ class ReportExecutionService:
                 {"phase": "preparing", "message": "Preparing report execution."},
             )
             try:
-                prepared_inputs = await self.input_preparer.prepare(
-                    query=request.workspace_discovery_instruction
-                    or request.instruction,
-                    existing_files=list(request.execution_files),
-                    discover_workspace_files=request.discover_workspace_files,
-                    organization_id=request.organization_id,
-                    workspace_id=request.workspace_id,
-                    runtime_gateway=request.runtime_gateway.model_dump(mode="json"),
-                    model=request.model,
-                    primary_source_id=request.primary_source_id,
-                )
+                prepared_inputs = await self._prepare_inputs_traced(request=request)
             except ReportInputPreparationError as exc:
                 raise _ReportPhaseError(
                     code="report_input_preparation_failed",
@@ -111,7 +154,7 @@ class ReportExecutionService:
                 update={"execution_files": prepared_inputs.files}
             )
             executor = self.executor_factory(effective_request)
-            await executor.materialize_assets()
+            await self._materialize_assets_traced(executor=executor)
             yield event_factory.create(
                 "report.inputs.selected",
                 ReportInputsSelected(
@@ -125,8 +168,8 @@ class ReportExecutionService:
             image_parts: list[dict[str, Any]] | None = None
             if self._is_multimodal_model(selected_model):
                 image_parts = await executor.get_multimodal_image_parts()
-            messages = build_report_messages(
-                effective_request,
+            messages = self._build_messages_traced(
+                request=effective_request,
                 available_files=executor.get_available_files_prompt(),
                 image_parts=image_parts,
             )
@@ -145,8 +188,8 @@ class ReportExecutionService:
                 round_content = ""
                 round_usage: dict[str, Any] | None = None
                 try:
-                    async for chunk in self.llm_service.stream_chat(
-                        messages,
+                    async for chunk in self._stream_llm_round_traced(
+                        messages=messages,
                         model=effective_request.model,
                         tool_definitions=executor.get_tool_definitions(),
                     ):
@@ -230,7 +273,11 @@ class ReportExecutionService:
                         started_payload,
                     )
                     try:
-                        result = await executor.execute_tool(name, arguments)
+                        result = await self._execute_tool_traced(
+                            executor=executor,
+                            name=name,
+                            arguments=arguments,
+                        )
                     except Exception as exc:
                         failed_payload = {
                             "tool_call_id": tool_call_id,
@@ -313,8 +360,9 @@ class ReportExecutionService:
                 provider_usage_seen=provider_usage_seen,
             )
             try:
-                artifacts = await executor.finalize_generated_files(
-                    generated_files,
+                artifacts = await self._finalize_artifacts_traced(
+                    executor=executor,
+                    generated_files=generated_files,
                     workspace_id=effective_request.workspace_id,
                 )
                 completion = ReportCompletion(
@@ -360,6 +408,74 @@ class ReportExecutionService:
         finally:
             if executor is not None:
                 await executor.close()
+
+    async def _prepare_inputs_impl(
+        self,
+        *,
+        request: ReportExecutionRequest,
+    ) -> Any:
+        return await self.input_preparer.prepare(
+            query=request.workspace_discovery_instruction or request.instruction,
+            existing_files=list(request.execution_files),
+            discover_workspace_files=request.discover_workspace_files,
+            organization_id=request.organization_id,
+            workspace_id=request.workspace_id,
+            runtime_gateway=request.runtime_gateway.model_dump(mode="json"),
+            model=request.model,
+            primary_source_id=request.primary_source_id,
+        )
+
+    @staticmethod
+    async def _materialize_assets_impl(*, executor: AxiomToolExecutor) -> None:
+        await executor.materialize_assets()
+
+    @staticmethod
+    def _build_messages_impl(
+        *,
+        request: ReportExecutionRequest,
+        available_files: str,
+        image_parts: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]]:
+        return build_report_messages(
+            request,
+            available_files=available_files,
+            image_parts=image_parts,
+        )
+
+    async def _stream_llm_round_impl(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        model: str | None,
+        tool_definitions: list[dict[str, Any]],
+    ) -> AsyncIterator[dict[str, Any]]:
+        async for chunk in self.llm_service.stream_chat(
+            messages,
+            model=model,
+            tool_definitions=tool_definitions,
+        ):
+            yield chunk
+
+    @staticmethod
+    async def _execute_tool_impl(
+        *,
+        executor: AxiomToolExecutor,
+        name: str,
+        arguments: dict[str, Any],
+    ) -> dict[str, Any]:
+        return await executor.execute_tool(name, arguments)
+
+    @staticmethod
+    async def _finalize_artifacts_impl(
+        *,
+        executor: AxiomToolExecutor,
+        generated_files: list[dict[str, Any]],
+        workspace_id: str | None,
+    ) -> list[dict[str, Any]]:
+        return await executor.finalize_generated_files(
+            generated_files,
+            workspace_id=workspace_id,
+        )
 
     @staticmethod
     def _parse_tool_call(tool_call: dict[str, Any]) -> tuple[str, dict[str, Any]]:

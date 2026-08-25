@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import json
 import unittest
 
@@ -195,7 +196,11 @@ def make_service(
     executor,
     runtime_gateway_client=None,
     multimodal_models: list[str] | None = None,
+    trace_operation=None,
 ):
+    tracing_kwargs = (
+        {"trace_operation": trace_operation} if trace_operation is not None else {}
+    )
     return ReportExecutionService(
         llm_service=llm,
         input_preparer=FakeInputPreparer(),
@@ -204,6 +209,7 @@ def make_service(
         max_iterations=3,
         runtime_gateway_client=runtime_gateway_client,
         multimodal_models=multimodal_models or [],
+        **tracing_kwargs,
     )
 
 
@@ -211,7 +217,58 @@ async def collect(stream):
     return [event async for event in stream]
 
 
+def recording_trace_operation(calls):
+    def trace_operation(function, *, name, run_type="chain", tags=None):
+        if inspect.isasyncgenfunction(function):
+            async def traced(*args, **kwargs):
+                calls.append((name, run_type, tags, kwargs))
+                async for item in function(*args, **kwargs):
+                    yield item
+
+            return traced
+        if inspect.iscoroutinefunction(function):
+            async def traced(*args, **kwargs):
+                calls.append((name, run_type, tags, kwargs))
+                return await function(*args, **kwargs)
+
+            return traced
+
+        def traced(*args, **kwargs):
+            calls.append((name, run_type, tags, kwargs))
+            return function(*args, **kwargs)
+
+        return traced
+
+    return trace_operation
+
+
 class ReportExecutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_remote_workflow_traces_root_and_each_report_stage(self):
+        trace_calls = []
+        events = await collect(
+            make_service(
+                ToolCallingLLM(),
+                FakeExecutor(),
+                runtime_gateway_client=RecordingRuntimeGatewayClient(),
+                trace_operation=recording_trace_operation(trace_calls),
+            ).stream(make_request())
+        )
+
+        self.assertEqual(events[-1].type, "report.completed")
+        self.assertEqual(
+            [call[0] for call in trace_calls],
+            [
+                "genreport-report-workflow",
+                "report-input-preparation",
+                "report-asset-materialization",
+                "report-prompt-construction",
+                "report-llm-round",
+                "report-tool-execution",
+                "report-llm-round",
+                "report-artifact-finalization",
+            ],
+        )
+
     async def test_streams_delta_usage_and_completion(self):
         executor = FakeExecutor()
         events = await collect(make_service(FakeLLM(), executor).stream(make_request()))
