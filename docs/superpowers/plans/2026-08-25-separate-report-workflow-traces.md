@@ -157,6 +157,10 @@ existing SSE event, failure mapping, gateway event, and cleanup behavior.
           )
           yield event_factory.create("report.failed", failure.model_dump(mode="json"))
           return
+      except Exception as exc:
+          failure = self._unexpected_failure(exc)
+          yield event_factory.create("report.failed", failure.model_dump(mode="json"))
+          return
 
       effective_request = request.model_copy(
           update={"execution_files": prepared_inputs.files}
@@ -172,6 +176,10 @@ existing SSE event, failure mapping, gateway event, and cleanup behavior.
   `request` and `selected_inputs`, create its `ReportEventFactory`, materialize
   assets, emit `report.inputs.selected`, then retain the existing LLM loop,
   failure mapping, and executor close in `finally`.
+
+  The pre-root preparation boundary must also map unexpected exceptions through
+  `_unexpected_failure()` so it preserves the existing typed `report.failed`
+  response instead of terminating the SSE stream.
 
   Do not wrap preparation with `trace_operation`; this lets the independent
   `DiscoveryAgent` trace remain a LangSmith root instead of a child.
