@@ -91,11 +91,13 @@ LANGSMITH_API_KEY=your-langsmith-api-key
 LANGCHAIN_PROJECT=gen-report
 ```
 
-`LANGCHAIN_TRACING_V2=true` is also supported for existing deployments. Each
-run has a `genreport-report-workflow` root trace with child traces for input or
-workspace preparation, asset materialization, prompt construction, every LLM
-round, tool call, and artifact finalization. Inputs and outputs are preserved in
-the trace, so restrict LangSmith project access appropriately.
+`LANGCHAIN_TRACING_V2=true` is also supported for existing deployments. Remote
+runs use a `genreport-report-workflow` root; CLI runs use
+`genreport-local-report-workflow`. Each has nested traces for discovery, input
+or workspace preparation, asset materialization, prompt construction, every LLM
+round, tool call, and artifact finalization. The traces intentionally preserve
+full prompts, tool inputs and results, generated-artifact metadata, and errors,
+so restrict LangSmith project access appropriately.
 
 ### Local CLI mode
 

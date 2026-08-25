@@ -46,43 +46,43 @@ class LocalReportRunner:
         self.llm_service = llm_service
         self._run_traced = trace_operation(
             self._run_impl,
-            name="genreport-report-workflow",
+            name="genreport-local-report-workflow",
             run_type="chain",
             tags=list(LOCAL_WORKFLOW_TAGS),
         )
         self._prepare_workspace_traced = trace_operation(
             self._prepare_workspace_impl,
-            name="report-workspace-preparation",
+            name="local-workspace-preparation",
             run_type="chain",
             tags=[*LOCAL_WORKFLOW_TAGS, "workspace"],
         )
         self._materialize_assets_traced = trace_operation(
             self._materialize_assets_impl,
-            name="report-asset-materialization",
+            name="local-asset-materialization",
             run_type="chain",
             tags=[*LOCAL_WORKFLOW_TAGS, "materialization"],
         )
         self._build_messages_traced = trace_operation(
             self._build_messages_impl,
-            name="report-prompt-construction",
+            name="local-prompt-construction",
             run_type="chain",
             tags=[*LOCAL_WORKFLOW_TAGS, "prompt"],
         )
         self._stream_llm_round_traced = trace_operation(
             self._stream_llm_round_impl,
-            name="report-llm-round",
+            name="local-llm-round",
             run_type="llm",
             tags=[*LOCAL_WORKFLOW_TAGS, "llm"],
         )
         self._execute_tool_traced = trace_operation(
             self._execute_tool_impl,
-            name="report-tool-execution",
+            name="local-tool-execution",
             run_type="tool",
             tags=[*LOCAL_WORKFLOW_TAGS, "tool"],
         )
         self._finalize_artifacts_traced = trace_operation(
             self._finalize_artifacts_impl,
-            name="report-artifact-finalization",
+            name="local-artifact-finalization",
             run_type="chain",
             tags=[*LOCAL_WORKFLOW_TAGS, "artifact"],
         )

@@ -15,11 +15,11 @@ class ReportTracingTests(unittest.TestCase):
     def test_workflow_tags_identify_remote_and_local_execution(self) -> None:
         self.assertEqual(
             REMOTE_WORKFLOW_TAGS,
-            ("genreport", "report-workflow", "remote"),
+            ["genreport", "report-workflow", "remote"],
         )
         self.assertEqual(
             LOCAL_WORKFLOW_TAGS,
-            ("genreport", "report-workflow", "local"),
+            ["genreport", "report-workflow", "local"],
         )
 
     def test_returns_original_function_when_tracing_is_disabled(self) -> None:

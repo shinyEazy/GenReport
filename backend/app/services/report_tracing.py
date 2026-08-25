@@ -10,8 +10,8 @@ from pydantic import BaseModel
 
 T = TypeVar("T")
 
-REMOTE_WORKFLOW_TAGS = ("genreport", "report-workflow", "remote")
-LOCAL_WORKFLOW_TAGS = ("genreport", "report-workflow", "local")
+REMOTE_WORKFLOW_TAGS = ["genreport", "report-workflow", "remote"]
+LOCAL_WORKFLOW_TAGS = ["genreport", "report-workflow", "local"]
 
 
 def trace_operation(

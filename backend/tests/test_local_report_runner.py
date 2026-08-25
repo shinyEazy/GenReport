@@ -144,14 +144,14 @@ class LocalReportRunnerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             [call[0] for call in trace_calls],
             [
-                "genreport-report-workflow",
-                "report-workspace-preparation",
-                "report-asset-materialization",
-                "report-prompt-construction",
-                "report-llm-round",
-                "report-tool-execution",
-                "report-llm-round",
-                "report-artifact-finalization",
+                "genreport-local-report-workflow",
+                "local-workspace-preparation",
+                "local-asset-materialization",
+                "local-prompt-construction",
+                "local-llm-round",
+                "local-tool-execution",
+                "local-llm-round",
+                "local-artifact-finalization",
             ],
         )
 
