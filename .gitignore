@@ -80,6 +80,7 @@ Thumbs.db
 .codex/
 .agents/
 feedback/
+.worktrees/
 
 # Process IDs
 *.pid
