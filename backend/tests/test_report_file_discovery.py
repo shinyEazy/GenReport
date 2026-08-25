@@ -69,7 +69,7 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(traced, decorated)
         trace_operation.assert_called_once_with(
             operation,
-            name="file-discovery",
+            name="genreport-file-discovery",
             run_type="chain",
             tags=["genreport", "file-discovery"],
         )

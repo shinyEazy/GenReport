@@ -260,7 +260,7 @@ def _trace_discovery_call(
 ) -> Callable[..., Awaitable[list[str]]]:
     return trace_operation(
         function,
-        name="file-discovery",
+        name="genreport-file-discovery",
         run_type="chain",
         tags=["genreport", "file-discovery"],
     )
