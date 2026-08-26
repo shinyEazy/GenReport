@@ -23,6 +23,18 @@ class FakeExecutionClient:
         self.calls.append(("read_file", {"path": path}))
         return self.files[path]
 
+    async def list_files(self, path):
+        prefix = path.rstrip("/") + "/"
+        return [
+            {
+                "path": file_path.removeprefix("/workspace/"),
+                "kind": "file",
+                "size_bytes": len(content),
+            }
+            for file_path, content in self.files.items()
+            if file_path.startswith(prefix) and "/" not in file_path[len(prefix) :]
+        ]
+
     async def close(self):
         return None
 
@@ -80,6 +92,7 @@ class AxiomToolExecutorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.calls[1][0], "write_file")
 
     async def test_finalize_normalizes_axiom_artifact_id_to_report_artifact_ref(self):
+        report_path = "/workspace/runs/resp_1/outputs/report.pdf"
         client = FakeExecutionClient(
             artifacts=[
                 {
@@ -90,7 +103,8 @@ class AxiomToolExecutorTests(unittest.IsolatedAsyncioTestCase):
                     "size": 123,
                     "url": "http://axiom/assets/asset-1",
                 }
-            ]
+            ],
+            files={report_path: b"pdf"},
         )
         executor = AxiomToolExecutor(
             client=client,
@@ -101,13 +115,42 @@ class AxiomToolExecutorTests(unittest.IsolatedAsyncioTestCase):
         )
 
         artifacts = await executor.finalize_generated_files(
-            [{"sandbox_path": "/workspace/runs/resp_1/outputs/report.pdf"}],
+            [{"sandbox_path": report_path}],
             workspace_id="workspace-1",
         )
 
         self.assertEqual(artifacts[0]["artifact_ref"], "asset-1")
         self.assertEqual(artifacts[0]["artifact_id"], "asset-1")
         self.assertEqual(artifacts[0]["url"], "http://axiom/assets/asset-1")
+
+    async def test_finalize_ignores_generated_files_deleted_by_the_workflow(self):
+        report_path = "/workspace/runs/resp_1/outputs/report.pdf"
+        deleted_path = "/workspace/runs/resp_1/outputs/report.tex"
+        client = FakeExecutionClient(
+            artifacts=[{"asset_id": "asset-report", "filename": "report.pdf"}],
+            files={report_path: b"pdf"},
+        )
+        executor = AxiomToolExecutor(
+            client=client,
+            files=[],
+            input_path="/workspace/runs/resp_1/inputs",
+            work_path="/workspace/runs/resp_1/work",
+            output_path="/workspace/runs/resp_1/outputs",
+        )
+
+        await executor.finalize_generated_files(
+            [
+                {"sandbox_path": deleted_path},
+                {"sandbox_path": report_path},
+            ],
+            workspace_id="workspace-1",
+        )
+
+        finalize_call = next(payload for name, payload in client.calls if name == "finalize")
+        self.assertEqual(
+            [item["path"] for item in finalize_call["entries"]],
+            [report_path],
+        )
 
     async def test_finalize_inlines_relative_html_images(self):
         report_path = "/workspace/runs/resp_1/outputs/report.html"

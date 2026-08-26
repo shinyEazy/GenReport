@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import fnmatch
 import json
+import logging
 import mimetypes
 import posixpath
 import re
@@ -29,6 +30,9 @@ HTML_IMAGE_SRC_PATTERN = re.compile(
     r"(?P<quote>['\"])(?P<src>[^'\"]+)(?P=quote)",
     re.IGNORECASE,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class AxiomToolExecutor:
@@ -152,13 +156,18 @@ class AxiomToolExecutor:
         self, generated_files: list[dict[str, Any]], workspace_id: str | None = None
     ) -> list[dict[str, Any]]:
         await self._inline_html_images(generated_files)
+        existing_paths = await self._existing_output_paths(generated_files)
         entries: list[dict[str, Any]] = []
         seen: set[str] = set()
+        dropped_paths: list[str] = []
         for item in generated_files:
             path = item.get("sandbox_path") or item.get("path")
             if not isinstance(path, str) or path in seen:
                 continue
             seen.add(path)
+            if _workspace_path(path) not in existing_paths:
+                dropped_paths.append(path)
+                continue
             filename = PurePosixPath(path).name
             entries.append(
                 {
@@ -168,6 +177,14 @@ class AxiomToolExecutor:
                     or "application/octet-stream",
                     "artifact_type": self._file_type(filename),
                 }
+            )
+        if dropped_paths:
+            logger.warning(
+                "genreport dropped deleted output files before finalization "
+                "output_path=%s dropped_files=%s remaining_file_count=%s",
+                self.output_path,
+                dropped_paths,
+                len(entries),
             )
         artifacts = await self.client.finalize(entries, workspace_id=workspace_id)
         normalized: list[dict[str, Any]] = []
@@ -182,6 +199,37 @@ class AxiomToolExecutor:
                 artifact["artifact_ref"] = artifact_ref
             normalized.append(artifact)
         return normalized
+
+    async def _existing_output_paths(
+        self, generated_files: list[dict[str, Any]]
+    ) -> set[str]:
+        candidate_paths = {
+            _workspace_path(path)
+            for item in generated_files
+            for path in [item.get("sandbox_path") or item.get("path")]
+            if isinstance(path, str)
+        }
+        if not candidate_paths:
+            return set()
+
+        existing: set[str] = set()
+        parents = {str(PurePosixPath(path).parent) for path in candidate_paths}
+        for parent in parents:
+            try:
+                listed = await self.client.list_files(parent)
+            except Exception:
+                logger.exception(
+                    "genreport output file listing failed output_parent=%s",
+                    parent,
+                )
+                continue
+            for item in listed:
+                if not isinstance(item, dict) or item.get("kind") != "file":
+                    continue
+                path = item.get("path")
+                if isinstance(path, str):
+                    existing.add(_workspace_path(path))
+        return existing
 
     async def _inline_html_images(
         self, generated_files: list[dict[str, Any]]
@@ -491,3 +539,8 @@ class AxiomToolExecutor:
         if suffix in {".csv", ".xlsx", ".xls", ".json", ".txt", ".html", ".md"}:
             return "data"
         return "file"
+
+
+def _workspace_path(path: str) -> str:
+    normalized = posixpath.normpath(path)
+    return normalized if normalized.startswith("/workspace/") else f"/workspace/{normalized.lstrip('/')}"
