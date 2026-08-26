@@ -1,7 +1,6 @@
 import unittest
 
 import httpx
-
 from main import app
 
 
@@ -24,11 +23,17 @@ class MainApplicationTests(unittest.IsolatedAsyncioTestCase):
             {"status": "healthy", "service": "gen-report-engine"},
         )
 
-    async def test_capabilities_publish_only_report_stream(self):
+    async def test_capabilities_publish_report_workflows(self):
         response = await self.client.get("/api/v1/capabilities")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["endpoints"], ["POST /api/v1/reports:stream"])
+        self.assertEqual(
+            response.json()["endpoints"],
+            [
+                "POST /api/v1/reports:stream",
+                "POST /api/v1/reports:extract-dashboard",
+            ],
+        )
         self.assertFalse(response.json()["persistence"])
         self.assertEqual(
             response.json()["execution_backend"],

@@ -45,6 +45,7 @@ class Settings(BaseSettings):
         default=8 * 1024 * 1024,
         ge=1,
     )
+    REPORT_DASHBOARD_MAX_PAGE_IMAGES: int = Field(default=8, ge=0, le=16)
 
     LANGSMITH_TRACING: bool = False
     LANGCHAIN_TRACING_V2: bool = False

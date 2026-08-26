@@ -45,7 +45,10 @@ async def capabilities() -> dict[str, object]:
     return {
         "schema_version": "1",
         "service": "gen-report-engine",
-        "endpoints": ["POST /api/v1/reports:stream"],
+        "endpoints": [
+            "POST /api/v1/reports:stream",
+            "POST /api/v1/reports:extract-dashboard",
+        ],
         "persistence": False,
         "execution_backend": "axiom-runtime-gateway",
     }

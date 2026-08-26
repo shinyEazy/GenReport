@@ -28,7 +28,6 @@ from app.services.report_tracing import (
 )
 from app.services.runtime_gateway_client import RuntimeGatewayClient
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -114,6 +113,13 @@ class ReportExecutionService:
         runtime_gateway_client: RuntimeGatewayClient | None = None,
         multimodal_models: list[str] | tuple[str, ...] = (),
         trace_operation: TraceOperation = default_trace_operation,
+        workflow_name: str = "genreport-report-workflow",
+        workflow_tags: list[str] | tuple[str, ...] | None = None,
+        emit_selected_inputs: bool = True,
+        preparing_message: str = "Preparing report execution.",
+        input_preparation_failure_phase: FailurePhase = "discovery",
+        prompt_builder: Callable[..., list[dict[str, Any]]] = build_report_messages,
+        pdf_page_image_max_pages: int = 0,
     ) -> None:
         self.llm_service = llm_service
         self.input_preparer = input_preparer
@@ -126,23 +132,30 @@ class ReportExecutionService:
             for model in multimodal_models
             if model.strip()
         }
+        self.workflow_name = workflow_name
+        self.workflow_tags = list(workflow_tags or REMOTE_WORKFLOW_TAGS)
+        self.emit_selected_inputs = emit_selected_inputs
+        self.preparing_message = preparing_message
+        self.input_preparation_failure_phase = input_preparation_failure_phase
+        self.prompt_builder = prompt_builder
+        self.pdf_page_image_max_pages = max(0, pdf_page_image_max_pages)
         self._stream_traced = trace_operation(
             self._stream_impl,
-            name="genreport-report-workflow",
+            name=workflow_name,
             run_type="chain",
-            tags=list(REMOTE_WORKFLOW_TAGS),
+            tags=list(self.workflow_tags),
         )
         self._stream_llm_round_traced = trace_operation(
             self._stream_llm_round_impl,
             name="model",
             run_type="llm",
-            tags=[*REMOTE_WORKFLOW_TAGS, "model"],
+            tags=[*self.workflow_tags, "model"],
         )
         self._execute_tool_traced = trace_operation(
             self._execute_tool_impl,
             name="tools",
             run_type="tool",
-            tags=[*REMOTE_WORKFLOW_TAGS, "tools"],
+            tags=[*self.workflow_tags, "tools"],
         )
 
     async def stream(
@@ -165,7 +178,7 @@ class ReportExecutionService:
         )
         yield event_factory.create(
             "report.status",
-            {"phase": "preparing", "message": "Preparing report execution."},
+            {"phase": "preparing", "message": self.preparing_message},
         )
         try:
             prepared_inputs = await self._prepare_inputs_impl(request=request)
@@ -180,7 +193,7 @@ class ReportExecutionService:
             )
             failure = ReportFailure(
                 code="report_input_preparation_failed",
-                phase="discovery",
+                phase=self.input_preparation_failure_phase,
                 message=str(exc),
                 retryable=True,
             )
@@ -244,20 +257,30 @@ class ReportExecutionService:
                 len(request.execution_files),
                 _file_descriptors(request.execution_files),
             )
-            yield event_factory.create(
-                "report.inputs.selected",
-                ReportInputsSelected(
-                    inputs=selected_inputs
-                ).model_dump(mode="json"),
-            )
+            if self.emit_selected_inputs:
+                yield event_factory.create(
+                    "report.inputs.selected",
+                    ReportInputsSelected(
+                        inputs=selected_inputs
+                    ).model_dump(mode="json"),
+                )
             selected_model = (
                 request.model
                 or getattr(self.llm_service, "default_model", "")
             )
             image_parts: list[dict[str, Any]] | None = None
             if self._is_multimodal_model(selected_model):
-                image_parts = await executor.get_multimodal_image_parts()
-            messages = build_report_messages(
+                if self.pdf_page_image_max_pages:
+                    get_pdf_page_image_parts = getattr(
+                        executor, "get_pdf_page_image_parts", None
+                    )
+                    if callable(get_pdf_page_image_parts):
+                        image_parts = await get_pdf_page_image_parts(
+                            max_pages=self.pdf_page_image_max_pages
+                        )
+                if image_parts is None:
+                    image_parts = await executor.get_multimodal_image_parts()
+            messages = self.prompt_builder(
                 request,
                 available_files=executor.get_available_files_prompt(),
                 image_parts=image_parts,

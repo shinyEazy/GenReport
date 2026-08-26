@@ -131,6 +131,68 @@ class AxiomToolExecutor:
             )
         return image_parts
 
+    async def get_pdf_page_image_parts(self, *, max_pages: int) -> list[dict[str, Any]]:
+        """Render a bounded PDF preview in the sandbox for multimodal extraction."""
+        if max_pages < 1 or not self.files:
+            return []
+        pdf = next(
+            (
+                item
+                for item in self.files
+                if item.content_type.split(";", 1)[0].strip().lower() == "application/pdf"
+            ),
+            None,
+        )
+        if pdf is None:
+            return []
+
+        pages_path = f"{self.work_path}/.pdf-pages"
+        result = await self.client.execute(
+            language="python",
+            code=(
+                "from pathlib import Path\n"
+                "import fitz\n"
+                f"source = fitz.open({pdf.sandbox_path!r})\n"
+                f"target = Path({pages_path!r})\n"
+                "target.mkdir(parents=True, exist_ok=True)\n"
+                f"for index in range(min(len(source), {min(max_pages, 16)})):\n"
+                "    page = source.load_page(index)\n"
+                "    pixmap = page.get_pixmap(matrix=fitz.Matrix(1.25, 1.25), alpha=False)\n"
+                "    pixmap.save(str(target / f'page-{index + 1:03d}.png'))\n"
+                "source.close()\n"
+            ),
+            cwd=self.work_path,
+            timeout_seconds=120,
+        )
+        if not result.get("success"):
+            logger.warning(
+                "genreport PDF page rendering failed filename=%s stderr=%s",
+                pdf.filename,
+                result.get("stderr") or result.get("stdout"),
+            )
+            return []
+
+        image_parts: list[dict[str, Any]] = []
+        for index in range(1, min(max_pages, 16) + 1):
+            path = f"{pages_path}/page-{index:03d}.png"
+            try:
+                content = await self.client.read_file(path)
+            except Exception:  # noqa: BLE001 - page previews are optional.
+                continue
+            if not content or len(content) > self.multimodal_image_max_bytes:
+                continue
+            encoded = base64.b64encode(content).decode("ascii")
+            image_parts.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{encoded}",
+                        "detail": self.multimodal_image_detail,
+                    },
+                }
+            )
+        return image_parts
+
     async def execute_tool(
         self, tool_name: str, tool_input: dict[str, Any], **_: Any
     ) -> dict[str, Any]:
