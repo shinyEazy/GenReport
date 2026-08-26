@@ -69,6 +69,8 @@ class PdfDashboardExtractionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn('"report.pdf#page=N"', system_prompt)
         self.assertIn("report-dashboard.json", system_prompt)
+        self.assertIn("at most 3 changes, 6", system_prompt)
+        self.assertIn("Do not repeat the headline", system_prompt)
         self.assertNotIn("report.pdf in the output directory", system_prompt)
 
     def test_builder_uses_distinct_trace_and_suppresses_discovery_event(self):

@@ -80,6 +80,12 @@ point value must be a finite number, never a placeholder or inferred value.
 Use concise evidence references such as report.pdf#page=2 whenever the PDF
 contains a page number. If the report has no reliable metric or chart, return
 empty arrays and explain that limitation in the headline and coverage.
+
+Keep the dashboard compact and decision-focused: return at most 3 changes, 6
+metrics, and 3 charts. Keep the headline summary to one short sentence, keep
+change details to one short sentence, and omit metric interpretations or chart
+descriptions when they add no new information. Do not repeat the headline in
+changes, metrics, or chart descriptions.
 """.strip()
     instruction = (
         "Extract the report's evidence-backed dashboard snapshot now. "
