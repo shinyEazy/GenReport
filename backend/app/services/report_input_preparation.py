@@ -71,18 +71,42 @@ class ReportInputPreparationService:
     ) -> PreparedReportInputs:
         files = list(existing_files)
         if not discover_workspace_files:
+            logger.info(
+                "genreport workspace file discovery skipped organization_id=%s "
+                "workspace_id=%s primary_source_id=%s existing_file_count=%s "
+                "existing_files=%s",
+                organization_id,
+                workspace_id,
+                primary_source_id,
+                len(files),
+                _file_descriptors(files),
+            )
             return _prepared_inputs(files, primary_source_id=primary_source_id)
         if not organization_id or not workspace_id:
             raise ReportInputPreparationError(
                 "Organization and workspace are required for report file discovery"
             )
 
+        logger.info(
+            "genreport workspace file discovery started organization_id=%s "
+            "workspace_id=%s existing_file_count=%s",
+            organization_id,
+            workspace_id,
+            len(files),
+        )
         try:
             document_ids = await self.discovery_agent.discover(
                 query=query,
                 organization_id=organization_id,
                 workspace_id=workspace_id,
                 model=model,
+            )
+            logger.info(
+                "genreport workspace file discovery completed organization_id=%s "
+                "workspace_id=%s discovered_document_count=%s",
+                organization_id,
+                workspace_id,
+                len(document_ids),
             )
         except Exception as exc:
             if files:
@@ -153,6 +177,15 @@ class ReportInputPreparationService:
             _with_source_metadata(file, artifact)
             for file, artifact in zip(related_files, artifacts, strict=True)
         )
+        logger.info(
+            "genreport workspace file staging completed organization_id=%s "
+            "workspace_id=%s related_file_count=%s related_files=%s total_file_count=%s",
+            organization_id,
+            workspace_id,
+            len(related_files),
+            _file_descriptors(related_files),
+            len(files),
+        )
         return _prepared_inputs(files, primary_source_id=primary_source_id)
 
     async def _resolve_artifacts(
@@ -220,6 +253,13 @@ class ReportInputPreparationService:
 class PreparedReportInputs:
     files: list[ExecutionFileRequest]
     selected_inputs: list[SelectedReportInput]
+
+
+def _file_descriptors(files: list[ExecutionFileRequest]) -> list[str]:
+    return [
+        f"{item.filename}[{item.content_type or 'unknown'}]"
+        for item in files
+    ]
 
 
 def _with_source_metadata(

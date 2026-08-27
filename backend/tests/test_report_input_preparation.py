@@ -34,6 +34,42 @@ def metadata_result(
 
 
 class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_logs_when_workspace_discovery_is_disabled(self) -> None:
+        discovery = AsyncMock()
+        service = ReportInputPreparationService(
+            discovery_agent=discovery,
+            method_hub=AsyncMock(),
+            runtime_gateway_client=AsyncMock(),
+        )
+        existing = [
+            ExecutionFileRequest(
+                artifact_id="asset-1",
+                filename="latest.xlsx",
+                sandbox_path="/workspace/runs/resp-1/inputs/latest.xlsx",
+                content_type="application/vnd.ms-excel",
+                size=123,
+                source_id="source-1",
+            )
+        ]
+
+        with self.assertLogs("app.services.report_input_preparation", level=logging.INFO) as logs:
+            prepared = await service.prepare(
+                query="Create a report",
+                existing_files=existing,
+                discover_workspace_files=False,
+                organization_id="test-org",
+                workspace_id="workspace-b",
+                runtime_gateway=None,
+                model="test-model",
+                primary_source_id="source-1",
+            )
+
+        discovery.discover.assert_not_awaited()
+        self.assertEqual(prepared.files[0].filename, "latest.xlsx")
+        output = "\n".join(logs.output)
+        self.assertIn("workspace file discovery skipped", output)
+        self.assertIn("latest.xlsx", output)
+
     async def test_resolves_document_ids_and_stages_authoritative_metadata(self) -> None:
         discovery = AsyncMock()
         discovery.discover.return_value = ["doc-1", "doc-1"]

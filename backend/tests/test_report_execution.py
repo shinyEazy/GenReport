@@ -1,7 +1,9 @@
 import asyncio
 import inspect
 import json
+import logging
 import unittest
+from types import SimpleNamespace
 
 from app.contracts.report_execution import (
     ExecutionFileRequest,
@@ -156,9 +158,23 @@ class ToolCallingLLM:
 class RecordingRuntimeGatewayClient:
     def __init__(self) -> None:
         self.events = []
+        self.gateways = []
 
     async def record_event(self, gateway, event_type, payload, *, status):
+        self.gateways.append(gateway)
         self.events.append((event_type, payload, status))
+
+
+class RefreshingExecutor(FakeExecutor):
+    def __init__(self) -> None:
+        super().__init__()
+        self.client = SimpleNamespace(
+            context=SimpleNamespace(capability_token="old-token", expires_at=9999999999)
+        )
+
+    async def execute_tool(self, tool_name, tool_input):
+        self.client.context.capability_token = "new-token"
+        return await super().execute_tool(tool_name, tool_input)
 
 
 class ImageExecutionClient:
@@ -243,6 +259,33 @@ def recording_trace_operation(calls):
 
 
 class ReportExecutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_logs_workflow_inputs_and_completion_artifacts(self):
+        with self.assertLogs("app.services.report_execution", level=logging.INFO) as logs:
+            await collect(make_service(FakeLLM(), FakeExecutor()).stream(make_request()))
+
+        output = "\n".join(logs.output)
+        self.assertIn("genreport workflow started", output)
+        self.assertIn("input.csv", output)
+        self.assertIn("genreport model round completed", output)
+        self.assertIn("report.pdf", output)
+        self.assertIn("genreport workflow completed", output)
+
+    async def test_runtime_events_use_refreshed_execution_token(self):
+        gateway = RecordingRuntimeGatewayClient()
+
+        await collect(
+            make_service(
+                ToolCallingLLM(),
+                RefreshingExecutor(),
+                runtime_gateway_client=gateway,
+            ).stream(make_request())
+        )
+
+        self.assertEqual(gateway.events[0][0], "report.tool.started")
+        self.assertEqual(gateway.events[0][2], "started")
+        self.assertEqual(gateway.gateways[0]["token"], "old-token")
+        self.assertEqual(gateway.gateways[1]["token"], "new-token")
+
     async def test_remote_workflow_traces_only_model_and_tool_rounds(self):
         trace_calls = []
         events = await collect(

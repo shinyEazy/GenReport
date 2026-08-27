@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import fnmatch
 import json
+import logging
 import mimetypes
 import posixpath
 import re
@@ -29,6 +30,9 @@ HTML_IMAGE_SRC_PATTERN = re.compile(
     r"(?P<quote>['\"])(?P<src>[^'\"]+)(?P=quote)",
     re.IGNORECASE,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class AxiomToolExecutor:
@@ -127,6 +131,68 @@ class AxiomToolExecutor:
             )
         return image_parts
 
+    async def get_pdf_page_image_parts(self, *, max_pages: int) -> list[dict[str, Any]]:
+        """Render a bounded PDF preview in the sandbox for multimodal extraction."""
+        if max_pages < 1 or not self.files:
+            return []
+        pdf = next(
+            (
+                item
+                for item in self.files
+                if item.content_type.split(";", 1)[0].strip().lower() == "application/pdf"
+            ),
+            None,
+        )
+        if pdf is None:
+            return []
+
+        pages_path = f"{self.work_path}/.pdf-pages"
+        result = await self.client.execute(
+            language="python",
+            code=(
+                "from pathlib import Path\n"
+                "import fitz\n"
+                f"source = fitz.open({pdf.sandbox_path!r})\n"
+                f"target = Path({pages_path!r})\n"
+                "target.mkdir(parents=True, exist_ok=True)\n"
+                f"for index in range(min(len(source), {min(max_pages, 16)})):\n"
+                "    page = source.load_page(index)\n"
+                "    pixmap = page.get_pixmap(matrix=fitz.Matrix(1.25, 1.25), alpha=False)\n"
+                "    pixmap.save(str(target / f'page-{index + 1:03d}.png'))\n"
+                "source.close()\n"
+            ),
+            cwd=self.work_path,
+            timeout_seconds=120,
+        )
+        if not result.get("success"):
+            logger.warning(
+                "genreport PDF page rendering failed filename=%s stderr=%s",
+                pdf.filename,
+                result.get("stderr") or result.get("stdout"),
+            )
+            return []
+
+        image_parts: list[dict[str, Any]] = []
+        for index in range(1, min(max_pages, 16) + 1):
+            path = f"{pages_path}/page-{index:03d}.png"
+            try:
+                content = await self.client.read_file(path)
+            except Exception:  # noqa: BLE001 - page previews are optional.
+                continue
+            if not content or len(content) > self.multimodal_image_max_bytes:
+                continue
+            encoded = base64.b64encode(content).decode("ascii")
+            image_parts.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{encoded}",
+                        "detail": self.multimodal_image_detail,
+                    },
+                }
+            )
+        return image_parts
+
     async def execute_tool(
         self, tool_name: str, tool_input: dict[str, Any], **_: Any
     ) -> dict[str, Any]:
@@ -152,13 +218,18 @@ class AxiomToolExecutor:
         self, generated_files: list[dict[str, Any]], workspace_id: str | None = None
     ) -> list[dict[str, Any]]:
         await self._inline_html_images(generated_files)
+        existing_paths = await self._existing_output_paths(generated_files)
         entries: list[dict[str, Any]] = []
         seen: set[str] = set()
+        dropped_paths: list[str] = []
         for item in generated_files:
             path = item.get("sandbox_path") or item.get("path")
             if not isinstance(path, str) or path in seen:
                 continue
             seen.add(path)
+            if _workspace_path(path) not in existing_paths:
+                dropped_paths.append(path)
+                continue
             filename = PurePosixPath(path).name
             entries.append(
                 {
@@ -168,6 +239,14 @@ class AxiomToolExecutor:
                     or "application/octet-stream",
                     "artifact_type": self._file_type(filename),
                 }
+            )
+        if dropped_paths:
+            logger.warning(
+                "genreport dropped deleted output files before finalization "
+                "output_path=%s dropped_files=%s remaining_file_count=%s",
+                self.output_path,
+                dropped_paths,
+                len(entries),
             )
         artifacts = await self.client.finalize(entries, workspace_id=workspace_id)
         normalized: list[dict[str, Any]] = []
@@ -182,6 +261,37 @@ class AxiomToolExecutor:
                 artifact["artifact_ref"] = artifact_ref
             normalized.append(artifact)
         return normalized
+
+    async def _existing_output_paths(
+        self, generated_files: list[dict[str, Any]]
+    ) -> set[str]:
+        candidate_paths = {
+            _workspace_path(path)
+            for item in generated_files
+            for path in [item.get("sandbox_path") or item.get("path")]
+            if isinstance(path, str)
+        }
+        if not candidate_paths:
+            return set()
+
+        existing: set[str] = set()
+        parents = {str(PurePosixPath(path).parent) for path in candidate_paths}
+        for parent in parents:
+            try:
+                listed = await self.client.list_files(parent)
+            except Exception:
+                logger.exception(
+                    "genreport output file listing failed output_parent=%s",
+                    parent,
+                )
+                continue
+            for item in listed:
+                if not isinstance(item, dict) or item.get("kind") != "file":
+                    continue
+                path = item.get("path")
+                if isinstance(path, str):
+                    existing.add(_workspace_path(path))
+        return existing
 
     async def _inline_html_images(
         self, generated_files: list[dict[str, Any]]
@@ -491,3 +601,8 @@ class AxiomToolExecutor:
         if suffix in {".csv", ".xlsx", ".xls", ".json", ".txt", ".html", ".md"}:
             return "data"
         return "file"
+
+
+def _workspace_path(path: str) -> str:
+    normalized = posixpath.normpath(path)
+    return normalized if normalized.startswith("/workspace/") else f"/workspace/{normalized.lstrip('/')}"
