@@ -40,7 +40,10 @@ class FakeExecutionClient:
 
     async def finalize(self, entries, *, workspace_id=None):
         self.calls.append(
-            ("finalize", {"entries": entries, "workspace_id": workspace_id})
+            (
+                "finalize",
+                {"entries": entries, "workspace_id": workspace_id},
+            )
         )
         return self.artifacts
 

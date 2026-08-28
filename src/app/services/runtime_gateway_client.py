@@ -19,7 +19,10 @@ class RuntimeGatewayClient:
         endpoint = runtime_gateway.get("endpoint")
         token = runtime_gateway.get("token")
         if not isinstance(endpoint, str) or not endpoint.startswith(
-            ("http://", "https://")
+            (
+                "http://",
+                "https://",
+            )
         ):
             return []
         if not isinstance(token, str) or not token:
@@ -93,7 +96,10 @@ class RuntimeGatewayClient:
         endpoint = runtime_gateway.get("endpoint")
         token = runtime_gateway.get("token")
         if not isinstance(endpoint, str) or not endpoint.startswith(
-            ("http://", "https://")
+            (
+                "http://",
+                "https://",
+            )
         ):
             return None, None
         if not isinstance(token, str) or not token:
