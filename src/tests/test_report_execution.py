@@ -31,9 +31,7 @@ class FakeInputPreparer:
                     filename=item.filename,
                     content_type=item.content_type,
                     role=(
-                        "primary"
-                        if item.source_id == primary_source_id
-                        else "related"
+                        "primary" if item.source_id == primary_source_id else "related"
                     ),
                 )
                 for item in files
@@ -236,6 +234,7 @@ async def collect(stream):
 def recording_trace_operation(calls):
     def trace_operation(function, *, name, run_type="chain", tags=None):
         if inspect.isasyncgenfunction(function):
+
             async def traced(*args, **kwargs):
                 calls.append((name, run_type, tags, kwargs))
                 async for item in function(*args, **kwargs):
@@ -243,6 +242,7 @@ def recording_trace_operation(calls):
 
             return traced
         if inspect.iscoroutinefunction(function):
+
             async def traced(*args, **kwargs):
                 calls.append((name, run_type, tags, kwargs))
                 return await function(*args, **kwargs)
@@ -260,8 +260,12 @@ def recording_trace_operation(calls):
 
 class ReportExecutionTests(unittest.IsolatedAsyncioTestCase):
     async def test_logs_workflow_inputs_and_completion_artifacts(self):
-        with self.assertLogs("app.services.report_execution", level=logging.INFO) as logs:
-            await collect(make_service(FakeLLM(), FakeExecutor()).stream(make_request()))
+        with self.assertLogs(
+            "app.services.report_execution", level=logging.INFO
+        ) as logs:
+            await collect(
+                make_service(FakeLLM(), FakeExecutor()).stream(make_request())
+            )
 
         output = "\n".join(logs.output)
         self.assertIn("genreport workflow started", output)
@@ -451,13 +455,15 @@ class ReportExecutionTests(unittest.IsolatedAsyncioTestCase):
         )
         request = ReportExecutionRequest.model_validate(payload)
 
-        events = await collect(
-            make_service(FakeLLM(), FakeExecutor()).stream(request)
-        )
+        events = await collect(make_service(FakeLLM(), FakeExecutor()).stream(request))
 
-        selected = next(event for event in events if event.type == "report.inputs.selected")
+        selected = next(
+            event for event in events if event.type == "report.inputs.selected"
+        )
         self.assertEqual(selected.payload["inputs"][0]["role"], "primary")
-        self.assertEqual([event.type for event in events][-2:], ["report.usage", "report.completed"])
+        self.assertEqual(
+            [event.type for event in events][-2:], ["report.usage", "report.completed"]
+        )
 
     async def test_streams_tool_lifecycle_while_preserving_gateway_recording(self):
         executor = FakeExecutor()
@@ -471,7 +477,9 @@ class ReportExecutionTests(unittest.IsolatedAsyncioTestCase):
             ).stream(make_request())
         )
 
-        tool_events = [event for event in events if event.type.startswith("report.tool.")]
+        tool_events = [
+            event for event in events if event.type.startswith("report.tool.")
+        ]
         self.assertEqual(
             [event.type for event in tool_events],
             ["report.tool.started", "report.tool.completed"],
@@ -534,9 +542,7 @@ class ReportExecutionTests(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_finalized_artifact_is_reported_as_artifact_failure(self):
         executor = FakeExecutor(artifacts=[{"filename": "report.pdf"}])
 
-        events = await collect(
-            make_service(FakeLLM(), executor).stream(make_request())
-        )
+        events = await collect(make_service(FakeLLM(), executor).stream(make_request()))
 
         self.assertEqual(events[-1].type, "report.failed")
         self.assertEqual(events[-1].payload["code"], "artifact_finalization_failed")

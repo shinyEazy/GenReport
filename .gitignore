@@ -55,7 +55,7 @@ dist-ssr/
 
 # Data directories
 /data/
-/backend/data/
+/src/data/
 data/exports/
 data/images/
 data/uploads/
@@ -93,8 +93,8 @@ feedback/
 *.synctex.gz
 
 # Backend generated files
-backend/data/reports/
-backend/*.tex
+src/data/reports/
+src/*.tex
 
 config.yaml
 docs/superpowers/

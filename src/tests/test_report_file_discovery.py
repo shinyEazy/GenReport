@@ -62,7 +62,9 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(traced, operation)
 
     @patch("app.services.report_file_discovery.trace_operation")
-    def test_trace_helper_delegates_to_shared_trace_operation(self, trace_operation) -> None:
+    def test_trace_helper_delegates_to_shared_trace_operation(
+        self, trace_operation
+    ) -> None:
         async def operation(**kwargs):
             return ["doc-1"]
 
@@ -80,11 +82,7 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_discovery_runs_through_injected_trace_wrapper(self) -> None:
         compiled = FakeCompiledAgent(
-            {
-                "structured_response": ReportArtifactSelection(
-                    document_ids=["doc-1"]
-                )
-            }
+            {"structured_response": ReportArtifactSelection(document_ids=["doc-1"])}
         )
         traced_calls = []
 
@@ -184,11 +182,7 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_discovery_blocks_retrieval_after_the_first_call(self) -> None:
         compiled = FakeCompiledAgent(
-            {
-                "structured_response": ReportArtifactSelection(
-                    document_ids=["doc-1"]
-                )
-            }
+            {"structured_response": ReportArtifactSelection(document_ids=["doc-1"])}
         )
         captured = {}
 
@@ -242,11 +236,7 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_accepts_dict_structured_response_and_enforces_limit(self) -> None:
         compiled = FakeCompiledAgent(
-            {
-                "structured_response": {
-                    "document_ids": ["doc-1", "doc-2", "doc-3"]
-                }
-            }
+            {"structured_response": {"document_ids": ["doc-1", "doc-2", "doc-3"]}}
         )
         agent = DiscoveryAgent(
             method_hub=FakeMethodHub(),

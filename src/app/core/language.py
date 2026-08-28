@@ -123,5 +123,7 @@ def resolve_language_request(
     value = (message or "").strip()
     match = _LANGUAGE_PREFIX.match(value)
     if match:
-        return get_language_profile(match.group("language")), match.group("message").strip()
+        return get_language_profile(match.group("language")), match.group(
+            "message"
+        ).strip()
     return get_language_profile(language), value

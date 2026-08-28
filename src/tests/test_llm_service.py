@@ -7,7 +7,9 @@ from app.services.llm_service import LLMService
 
 class LLMServiceCompatibilityTests(unittest.IsolatedAsyncioTestCase):
     @patch("app.services.llm_service.openai.AsyncOpenAI")
-    async def test_constructor_uses_per_run_provider_settings(self, client_factory) -> None:
+    async def test_constructor_uses_per_run_provider_settings(
+        self, client_factory
+    ) -> None:
         LLMService(
             api_key="config-key",
             base_url="https://provider.example/v1",

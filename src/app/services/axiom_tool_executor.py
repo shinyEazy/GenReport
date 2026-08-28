@@ -95,7 +95,9 @@ class AxiomToolExecutor:
         lines = ["AVAILABLE INPUT FILES:"]
         for item in self.files:
             lines.append(f"  - {item.filename}: {item.sandbox_path}")
-        lines.append("Inputs are read-only. Save every generated file under the output workspace.")
+        lines.append(
+            "Inputs are read-only. Save every generated file under the output workspace."
+        )
         return "\n".join(lines)
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
@@ -139,7 +141,8 @@ class AxiomToolExecutor:
             (
                 item
                 for item in self.files
-                if item.content_type.split(";", 1)[0].strip().lower() == "application/pdf"
+                if item.content_type.split(";", 1)[0].strip().lower()
+                == "application/pdf"
             ),
             None,
         )
@@ -208,7 +211,11 @@ class AxiomToolExecutor:
         }
         handler = handlers.get(tool_name)
         if handler is None:
-            return {"success": False, "error": f"Unknown tool: {tool_name}", "output": ""}
+            return {
+                "success": False,
+                "error": f"Unknown tool: {tool_name}",
+                "output": "",
+            }
         try:
             return await handler(dict(tool_input))
         except Exception as exc:
@@ -293,9 +300,7 @@ class AxiomToolExecutor:
                     existing.add(_workspace_path(path))
         return existing
 
-    async def _inline_html_images(
-        self, generated_files: list[dict[str, Any]]
-    ) -> None:
+    async def _inline_html_images(self, generated_files: list[dict[str, Any]]) -> None:
         files_by_path: dict[str, str] = {}
         for item in generated_files:
             path = item.get("sandbox_path") or item.get("path")
@@ -461,7 +466,12 @@ class AxiomToolExecutor:
         max_results = min(int(value.get("max_results") or 200), 500)
         root = self._read_root(str(value.get("path") or self.output_path))
         snapshot = await self._recursive_snapshot(root)
-        matches = [path for path in snapshot if fnmatch.fnmatch(PurePosixPath(path).name, pattern) or fnmatch.fnmatch(path, pattern)]
+        matches = [
+            path
+            for path in snapshot
+            if fnmatch.fnmatch(PurePosixPath(path).name, pattern)
+            or fnmatch.fnmatch(path, pattern)
+        ]
         matches = matches[:max_results]
         return {"success": True, "matches": matches, "output": "\n".join(matches)}
 
@@ -478,14 +488,20 @@ class AxiomToolExecutor:
             if not fnmatch.fnmatch(PurePosixPath(path).name, include_glob):
                 continue
             try:
-                content = (await self.client.read_file(path)).decode("utf-8", errors="replace")
+                content = (await self.client.read_file(path)).decode(
+                    "utf-8", errors="replace"
+                )
             except Exception:
                 continue
             for line_number, line in enumerate(content.splitlines(), 1):
                 if expression.search(line):
                     matches.append(f"{path}:{line_number}:{line[:500]}")
                     if len(matches) >= max_results:
-                        return {"success": True, "matches": matches, "output": "\n".join(matches)}
+                        return {
+                            "success": True,
+                            "matches": matches,
+                            "output": "\n".join(matches),
+                        }
         return {"success": True, "matches": matches, "output": "\n".join(matches)}
 
     async def _update_todo(self, value: dict[str, Any]) -> dict[str, Any]:
@@ -527,7 +543,9 @@ class AxiomToolExecutor:
                     f"{self.work_path}/{path}",
                 ]
             )
-            declared = self._inputs_by_name.get(str(path)) or self._inputs_by_name.get(path.name)
+            declared = self._inputs_by_name.get(str(path)) or self._inputs_by_name.get(
+                path.name
+            )
             if declared:
                 candidates.append(declared)
         for candidate in candidates:
@@ -546,7 +564,9 @@ class AxiomToolExecutor:
             path = PurePosixPath(self.output_path) / path
         resolved = str(path)
         allowed = (self.input_path, self.work_path, self.output_path)
-        if not any(resolved == root or resolved.startswith(f"{root}/") for root in allowed):
+        if not any(
+            resolved == root or resolved.startswith(f"{root}/") for root in allowed
+        ):
             raise ValueError("read path is outside the run workspace")
         return resolved
 
@@ -560,7 +580,9 @@ class AxiomToolExecutor:
             current = pending.pop()
             for item in await self.client.list_files(current):
                 path = str(item.get("path") or "")
-                absolute = path if path.startswith("/workspace/") else f"/workspace/{path}"
+                absolute = (
+                    path if path.startswith("/workspace/") else f"/workspace/{path}"
+                )
                 if item.get("kind") == "directory":
                     if "/.skills" not in absolute:
                         pending.append(absolute)
@@ -605,4 +627,8 @@ class AxiomToolExecutor:
 
 def _workspace_path(path: str) -> str:
     normalized = posixpath.normpath(path)
-    return normalized if normalized.startswith("/workspace/") else f"/workspace/{normalized.lstrip('/')}"
+    return (
+        normalized
+        if normalized.startswith("/workspace/")
+        else f"/workspace/{normalized.lstrip('/')}"
+    )

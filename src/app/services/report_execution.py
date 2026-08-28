@@ -70,8 +70,7 @@ def _file_descriptors(files: list[Any]) -> list[str]:
 
 def _selected_input_descriptors(inputs: list[Any]) -> list[str]:
     return [
-        f"{getattr(item, 'filename', 'unknown')}"
-        f"[{getattr(item, 'role', 'unknown')}]"
+        f"{getattr(item, 'filename', 'unknown')}[{getattr(item, 'role', 'unknown')}]"
         for item in inputs
     ]
 
@@ -128,9 +127,7 @@ class ReportExecutionService:
         self.max_iterations = max(1, max_iterations)
         self.runtime_gateway_client = runtime_gateway_client or RuntimeGatewayClient()
         self.multimodal_models = {
-            model.strip().casefold()
-            for model in multimodal_models
-            if model.strip()
+            model.strip().casefold() for model in multimodal_models if model.strip()
         }
         self.workflow_name = workflow_name
         self.workflow_tags = list(workflow_tags or REMOTE_WORKFLOW_TAGS)
@@ -260,13 +257,12 @@ class ReportExecutionService:
             if self.emit_selected_inputs:
                 yield event_factory.create(
                     "report.inputs.selected",
-                    ReportInputsSelected(
-                        inputs=selected_inputs
-                    ).model_dump(mode="json"),
+                    ReportInputsSelected(inputs=selected_inputs).model_dump(
+                        mode="json"
+                    ),
                 )
-            selected_model = (
-                request.model
-                or getattr(self.llm_service, "default_model", "")
+            selected_model = request.model or getattr(
+                self.llm_service, "default_model", ""
             )
             image_parts: list[dict[str, Any]] | None = None
             if self._is_multimodal_model(selected_model):
@@ -340,12 +336,16 @@ class ReportExecutionService:
                             done_calls = chunk.get("tool_calls")
                             if isinstance(done_calls, list):
                                 tool_calls = [
-                                    item for item in done_calls if isinstance(item, dict)
+                                    item
+                                    for item in done_calls
+                                    if isinstance(item, dict)
                                 ]
                             if isinstance(chunk.get("usage"), dict):
                                 round_usage = chunk["usage"]
                         elif chunk_type == "error":
-                            raise RuntimeError(str(chunk.get("content") or "Model failed"))
+                            raise RuntimeError(
+                                str(chunk.get("content") or "Model failed")
+                            )
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
@@ -727,8 +727,7 @@ class ReportExecutionService:
         )
         reasoning_tokens = int(value.get("reasoning_tokens") or 0)
         total_tokens = int(
-            value.get("total_tokens")
-            or input_tokens + output_tokens + reasoning_tokens
+            value.get("total_tokens") or input_tokens + output_tokens + reasoning_tokens
         )
         return {
             "input_tokens": max(0, input_tokens),
@@ -746,7 +745,11 @@ class ReportExecutionService:
         totals: dict[str, int],
         provider_usage_seen: bool,
     ) -> ReportUsage:
-        model = request.model or getattr(self.llm_service, "default_model", None) or "unknown"
+        model = (
+            request.model
+            or getattr(self.llm_service, "default_model", None)
+            or "unknown"
+        )
         if provider_usage_seen:
             return ReportUsage(model=model, estimated=False, **totals)
         input_characters = len(json.dumps(messages, default=str))

@@ -52,7 +52,9 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             )
         ]
 
-        with self.assertLogs("app.services.report_input_preparation", level=logging.INFO) as logs:
+        with self.assertLogs(
+            "app.services.report_input_preparation", level=logging.INFO
+        ) as logs:
             prepared = await service.prepare(
                 query="Create a report",
                 existing_files=existing,
@@ -70,7 +72,9 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("workspace file discovery skipped", output)
         self.assertIn("latest.xlsx", output)
 
-    async def test_resolves_document_ids_and_stages_authoritative_metadata(self) -> None:
+    async def test_resolves_document_ids_and_stages_authoritative_metadata(
+        self,
+    ) -> None:
         discovery = AsyncMock()
         discovery.discover.return_value = ["doc-1", "doc-1"]
         method_hub = AsyncMock()
@@ -220,7 +224,9 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
         method_hub.call_tool.assert_not_awaited()
         runtime_gateway.stage_report_inputs.assert_not_awaited()
 
-    async def test_primary_execution_file_is_retained_and_related_files_are_appended(self) -> None:
+    async def test_primary_execution_file_is_retained_and_related_files_are_appended(
+        self,
+    ) -> None:
         existing = [
             ExecutionFileRequest(
                 artifact_id="attachment-1",
@@ -350,7 +356,9 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
         method_hub.call_tool.assert_not_awaited()
         runtime_gateway.stage_report_inputs.assert_not_awaited()
 
-    async def test_no_usable_related_artifacts_retains_existing_primary_file(self) -> None:
+    async def test_no_usable_related_artifacts_retains_existing_primary_file(
+        self,
+    ) -> None:
         existing = [
             ExecutionFileRequest(
                 artifact_id="attachment-1",

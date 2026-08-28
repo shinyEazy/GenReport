@@ -58,7 +58,10 @@ class ReportPromptTests(unittest.TestCase):
 
         self.assertEqual(
             messages[-1]["content"][0],
-            {"type": "text", "text": f"Current report instruction:\n{self.request.instruction}"},
+            {
+                "type": "text",
+                "text": f"Current report instruction:\n{self.request.instruction}",
+            },
         )
         self.assertEqual(messages[-1]["content"][1], image_part)
 

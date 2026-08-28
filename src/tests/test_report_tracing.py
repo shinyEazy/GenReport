@@ -32,7 +32,9 @@ class ReportTracingTests(unittest.TestCase):
         self.assertIs(traced, operation)
 
     @patch("langsmith.traceable")
-    def test_configures_named_operation_with_full_payload_processors(self, traceable) -> None:
+    def test_configures_named_operation_with_full_payload_processors(
+        self, traceable
+    ) -> None:
         def operation(value):
             return value
 

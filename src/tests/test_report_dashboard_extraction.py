@@ -90,10 +90,14 @@ class PdfDashboardExtractionTests(unittest.IsolatedAsyncioTestCase):
             trace_operation=trace_operation,
         )
 
-        self.assertEqual(trace_calls[0]["name"], "genreport-dashboard-extraction-workflow")
+        self.assertEqual(
+            trace_calls[0]["name"], "genreport-dashboard-extraction-workflow"
+        )
         self.assertIn("dashboard-extraction", trace_calls[0]["tags"])
         self.assertFalse(service.emit_selected_inputs)
-        self.assertEqual(service.workflow_name, "genreport-dashboard-extraction-workflow")
+        self.assertEqual(
+            service.workflow_name, "genreport-dashboard-extraction-workflow"
+        )
 
 
 if __name__ == "__main__":

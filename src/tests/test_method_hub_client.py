@@ -60,8 +60,14 @@ class MethodHubLangChainToolTests(unittest.IsolatedAsyncioTestCase):
 
         client = method_hub_client.MethodHubClient("http://method-hub.test/mcp")
         with (
-            patch.object(method_hub_client, "_load_mcp_client", return_value=(FakeSession, fake_streamable_http_client)),
-            patch.object(method_hub_client.httpx, "AsyncClient", side_effect=record_client),
+            patch.object(
+                method_hub_client,
+                "_load_mcp_client",
+                return_value=(FakeSession, fake_streamable_http_client),
+            ),
+            patch.object(
+                method_hub_client.httpx, "AsyncClient", side_effect=record_client
+            ),
         ):
             async with client._session():
                 pass

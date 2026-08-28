@@ -114,6 +114,7 @@ class Settings(BaseSettings):
     ):
         return init_settings, env_settings, dotenv_settings, file_secret_settings
 
+
 def configure_langsmith_environment(value: Settings) -> None:
     tracing = "true" if value.LANGSMITH_TRACING else "false"
     os.environ["LANGSMITH_TRACING"] = tracing

@@ -256,10 +256,7 @@ class PreparedReportInputs:
 
 
 def _file_descriptors(files: list[ExecutionFileRequest]) -> list[str]:
-    return [
-        f"{item.filename}[{item.content_type or 'unknown'}]"
-        for item in files
-    ]
+    return [f"{item.filename}[{item.content_type or 'unknown'}]" for item in files]
 
 
 def _with_source_metadata(
@@ -297,17 +294,14 @@ def _prepared_inputs(
             object_key=item.source_object_key or item.artifact_id,
             filename=item.filename,
             content_type=item.content_type,
-            role=(
-                "primary"
-                if item.source_id == primary_source_id
-                else "related"
-            ),
+            role=("primary" if item.source_id == primary_source_id else "related"),
         )
         for item in unique_files
     ]
-    if primary_source_id is not None and sum(
-        item.role == "primary" for item in selected_inputs
-    ) != 1:
+    if (
+        primary_source_id is not None
+        and sum(item.role == "primary" for item in selected_inputs) != 1
+    ):
         raise ReportInputPreparationError(
             "primary source must match exactly one selected report input"
         )

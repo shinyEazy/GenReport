@@ -102,7 +102,9 @@ class ReportExecutionRequest(BaseModel):
     organization_id: str = Field(min_length=1, max_length=255)
     workspace_id: str = Field(min_length=1, max_length=255)
     execution_context: ExecutionContextRequest
-    execution_files: list[ExecutionFileRequest] = Field(default_factory=list, max_length=100)
+    execution_files: list[ExecutionFileRequest] = Field(
+        default_factory=list, max_length=100
+    )
     runtime_gateway: RuntimeGatewayCapability
     discover_workspace_files: bool = False
     workspace_discovery_instruction: str | None = Field(

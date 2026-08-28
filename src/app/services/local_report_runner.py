@@ -153,7 +153,9 @@ class LocalReportRunner:
                                 item for item in done_calls if isinstance(item, dict)
                             ]
                     elif chunk_type == "error":
-                        raise LocalReportRunError(str(chunk.get("content") or "Model failed."))
+                        raise LocalReportRunError(
+                            str(chunk.get("content") or "Model failed.")
+                        )
 
                 if not tool_calls:
                     artifacts = await self._finalize_artifacts_traced(
@@ -295,7 +297,11 @@ class LocalReportRunner:
         try:
             arguments = json.loads(str(function.get("arguments") or "{}"))
         except json.JSONDecodeError as exc:
-            raise LocalReportRunError("The report model emitted invalid tool arguments.") from exc
+            raise LocalReportRunError(
+                "The report model emitted invalid tool arguments."
+            ) from exc
         if not name or not isinstance(arguments, dict):
-            raise LocalReportRunError("The report model emitted invalid tool arguments.")
+            raise LocalReportRunError(
+                "The report model emitted invalid tool arguments."
+            )
         return name, arguments

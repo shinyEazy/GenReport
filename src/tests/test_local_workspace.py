@@ -28,9 +28,7 @@ class LocalWorkspaceTests(unittest.TestCase):
             "/workspace/runs/run_1/inputs/source.csv",
         )
         self.assertEqual(
-            workspace.resolve_virtual_path(
-                "/workspace/runs/run_1/inputs/source.csv"
-            ),
+            workspace.resolve_virtual_path("/workspace/runs/run_1/inputs/source.csv"),
             workspace.inputs_dir / "source.csv",
         )
         self.assertEqual(
@@ -49,7 +47,9 @@ class LocalWorkspaceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             workspace.resolve_virtual_path("/workspace/runs/run_2/outputs/report.txt")
         with self.assertRaises(ValueError):
-            workspace.resolve_virtual_path("/workspace/runs/run_1/outputs/../inputs/a.csv")
+            workspace.resolve_virtual_path(
+                "/workspace/runs/run_1/outputs/../inputs/a.csv"
+            )
 
     def test_lists_only_output_files_as_artifacts(self) -> None:
         workspace = LocalWorkspace.create(self.root, "run_1", [self.source])
@@ -61,7 +61,9 @@ class LocalWorkspaceTests(unittest.TestCase):
 
         artifacts = workspace.artifact_entries()
 
-        self.assertEqual([item["filename"] for item in artifacts], ["chart.png", "report.txt"])
+        self.assertEqual(
+            [item["filename"] for item in artifacts], ["chart.png", "report.txt"]
+        )
         self.assertEqual(
             artifacts[0]["path"],
             "/workspace/runs/run_1/outputs/charts/chart.png",

@@ -32,7 +32,9 @@ class PdfDashboardInputPreparationService:
             )
         source = existing_files[0]
         content_type = source.content_type.split(";", 1)[0].strip().lower()
-        if content_type != "application/pdf" or not source.filename.lower().endswith(".pdf"):
+        if content_type != "application/pdf" or not source.filename.lower().endswith(
+            ".pdf"
+        ):
             raise ReportInputPreparationError(
                 "Dashboard extraction accepts only a PDF report input"
             )
@@ -47,13 +49,15 @@ def build_dashboard_extraction_messages(
 ) -> list[dict]:
     system_prompt = f"""You are the AXIOM report dashboard extraction workflow.
 
-{render_system_prompt(
-    language=request.language,
-    input_path=request.execution_context.input_path,
-    work_path=request.execution_context.work_path,
-    output_path=request.execution_context.output_path,
-    available_files=available_files,
-)}
+{
+        render_system_prompt(
+            language=request.language,
+            input_path=request.execution_context.input_path,
+            work_path=request.execution_context.work_path,
+            output_path=request.execution_context.output_path,
+            available_files=available_files,
+        )
+    }
 
 The only authoritative input is the supplied completed PDF report. Do not use
 workspace discovery, Method Hub, external sources, or any file other than that

@@ -28,8 +28,7 @@ class AxiomExecutionClient:
 
     def _url(self, suffix: str) -> str:
         return (
-            f"{str(self.context.gateway_url).rstrip('/')}/sandbox/"
-            f"{suffix.lstrip('/')}"
+            f"{str(self.context.gateway_url).rstrip('/')}/sandbox/{suffix.lstrip('/')}"
         )
 
     async def execute(
@@ -237,8 +236,7 @@ class AxiomExecutionClient:
             except Exception:
                 detail = exc.response.text
         return (
-            exc.response.status_code in {404, 409, 410}
-            and "sandbox" in detail.lower()
+            exc.response.status_code in {404, 409, 410} and "sandbox" in detail.lower()
         )
 
     async def _direct_request(

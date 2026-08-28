@@ -57,7 +57,9 @@ class ReportsApiTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.headers["content-type"].startswith("text/event-stream"))
+        self.assertTrue(
+            response.headers["content-type"].startswith("text/event-stream")
+        )
         self.assertIn("event: report.completed", response.text)
 
     async def test_reports_stream_returns_validation_error_before_sse(self):
@@ -79,7 +81,9 @@ class ReportsApiTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.headers["content-type"].startswith("text/event-stream"))
+        self.assertTrue(
+            response.headers["content-type"].startswith("text/event-stream")
+        )
         self.assertIn("event: report.output_text.delta", response.text)
         self.assertIn("event: report.completed", response.text)
 

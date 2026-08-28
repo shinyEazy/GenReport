@@ -24,9 +24,7 @@ class DeploymentConfigTests(unittest.TestCase):
         self.assertEqual(set(compose.get("volumes", {})), {"uv-cache"})
 
     def test_environment_example_is_engine_only(self):
-        env_example = (ROOT / "backend" / ".env.example").read_text(
-            encoding="utf-8"
-        )
+        env_example = (ROOT / "backend" / ".env.example").read_text(encoding="utf-8")
 
         self.assertNotIn("GEN_REPORT_API_TOKEN", env_example)
         for legacy in (

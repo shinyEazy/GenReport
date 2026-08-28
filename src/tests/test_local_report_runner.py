@@ -13,6 +13,7 @@ from app.services.local_report_runner import LocalReportRunError, LocalReportRun
 def recording_trace_operation(calls):
     def trace_operation(function, *, name, run_type="chain", tags=None):
         if inspect.isasyncgenfunction(function):
+
             async def traced(*args, **kwargs):
                 calls.append((name, run_type, tags, kwargs))
                 async for item in function(*args, **kwargs):
@@ -20,6 +21,7 @@ def recording_trace_operation(calls):
 
             return traced
         if inspect.iscoroutinefunction(function):
+
             async def traced(*args, **kwargs):
                 calls.append((name, run_type, tags, kwargs))
                 return await function(*args, **kwargs)
@@ -57,7 +59,7 @@ class ToolCallingLLM:
                         "function": {
                             "name": "execute_python",
                             "arguments": (
-                                "{\"code\": \"from pathlib import Path; "
+                                '{"code": "from pathlib import Path; '
                                 "Path('report.txt').write_text('done')\"}"
                             ),
                         },
@@ -163,7 +165,9 @@ class LocalReportRunnerTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result.output_text, "Report ready.")
-        self.assertEqual([item["filename"] for item in result.artifacts], ["report.txt"])
+        self.assertEqual(
+            [item["filename"] for item in result.artifacts], ["report.txt"]
+        )
         self.assertTrue((result.workspace.outputs_dir / "report.txt").is_file())
         self.assertIn("source.csv", llm.messages[0]["content"])
         self.assertEqual(llm.models, ["test-model", "test-model"])

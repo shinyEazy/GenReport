@@ -125,9 +125,13 @@ class LocalExecutionClient:
 
     def _translate_virtual_paths(self, value: str) -> str:
         replacements = {
-            self.workspace.virtual_inputs_path: str(self.workspace.inputs_dir.resolve()),
+            self.workspace.virtual_inputs_path: str(
+                self.workspace.inputs_dir.resolve()
+            ),
             self.workspace.virtual_work_path: str(self.workspace.work_dir.resolve()),
-            self.workspace.virtual_outputs_path: str(self.workspace.outputs_dir.resolve()),
+            self.workspace.virtual_outputs_path: str(
+                self.workspace.outputs_dir.resolve()
+            ),
         }
         for virtual_path, local_path in replacements.items():
             value = value.replace(virtual_path, local_path)

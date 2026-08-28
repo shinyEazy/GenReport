@@ -15,7 +15,9 @@ class LocalWorkspace:
     outputs_dir: Path
 
     @classmethod
-    def create(cls, root: Path, run_id: str, source_files: list[Path]) -> LocalWorkspace:
+    def create(
+        cls, root: Path, run_id: str, source_files: list[Path]
+    ) -> LocalWorkspace:
         workspace_root = root.expanduser().resolve()
         workspace_root.mkdir(parents=True, exist_ok=True)
         run_root = workspace_root / run_id

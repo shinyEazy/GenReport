@@ -51,8 +51,7 @@ class StatelessArchitectureTests(unittest.TestCase):
             "get_oss_service",
         )
         sources = "\n".join(
-            path.read_text(encoding="utf-8")
-            for path in (BACKEND / "app").rglob("*.py")
+            path.read_text(encoding="utf-8") for path in (BACKEND / "app").rglob("*.py")
         )
 
         self.assertEqual([value for value in forbidden if value in sources], [])

@@ -146,7 +146,9 @@ class AxiomToolExecutorTests(unittest.IsolatedAsyncioTestCase):
             workspace_id="workspace-1",
         )
 
-        finalize_call = next(payload for name, payload in client.calls if name == "finalize")
+        finalize_call = next(
+            payload for name, payload in client.calls if name == "finalize"
+        )
         self.assertEqual(
             [item["path"] for item in finalize_call["entries"]],
             [report_path],

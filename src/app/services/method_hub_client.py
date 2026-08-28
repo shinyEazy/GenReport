@@ -67,9 +67,7 @@ class MethodHubClient:
         workspace_id: str,
     ) -> list[BaseTool]:
         allowed = set(allowed_names)
-        definitions = [
-            tool for tool in await self.list_tools() if tool.name in allowed
-        ]
+        definitions = [tool for tool in await self.list_tools() if tool.name in allowed]
         return [
             self._create_langchain_tool(
                 definition,

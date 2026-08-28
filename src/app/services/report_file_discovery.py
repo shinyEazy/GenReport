@@ -122,11 +122,7 @@ def _primary_error(exc: BaseException) -> BaseException:
 
 def _exception_leaves(exc: BaseException) -> list[BaseException]:
     if isinstance(exc, BaseExceptionGroup):
-        return [
-            leaf
-            for nested in exc.exceptions
-            for leaf in _exception_leaves(nested)
-        ]
+        return [leaf for nested in exc.exceptions for leaf in _exception_leaves(nested)]
     return [exc]
 
 
