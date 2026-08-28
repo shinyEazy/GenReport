@@ -27,7 +27,7 @@ REPORT_RETRIEVAL_TOOL_NAMES = {
     "corpus_bm25_search",
     "corpus_get_file_ingested_data",
 }
-MAX_REPORT_RETRIEVAL_TOOL_CALLS = 5
+MAX_REPORT_RETRIEVAL_TOOL_CALLS = 1
 
 _HIDDEN_DEEP_AGENT_TOOLS = frozenset(
     {

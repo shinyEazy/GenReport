@@ -68,6 +68,9 @@ def build_report_messages(
     instruction = f"{request.instruction}"
     content: str | list[dict[str, Any]] = instruction
     if image_parts:
-        content = [{"type": "text", "text": instruction}, *image_parts]
+        content = [
+            {"type": "text", "text": f"Current report instruction:\n{instruction}"},
+            *image_parts,
+        ]
     messages.append({"role": "user", "content": content})
     return messages
