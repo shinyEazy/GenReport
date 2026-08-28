@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAPH LAP 10th Annual Report — Analysis of Pulmonary Hypertension Centre Action Plans</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #F0F2F5;
+    color: #263238;
+    line-height: 1.7;
+    padding: 0;
+  }
+  
+  .container { max-width: 1100px; margin: 0 auto; padding: 40px 24px 60px; }
+  
+  /* Hero Header */
+  .hero {
+    background: linear-gradient(135deg, #0D47A1 0%, #1565C0 40%, #1976D2 100%);
+    color: white;
+    padding: 56px 48px 48px;
+    border-radius: 16px;
+    margin-bottom: 40px;
+    box-shadow: 0 8px 32px rgba(13,71,161,0.25);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 280px; height: 280px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 50%;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: -40px; left: 40%;
+    width: 200px; height: 200px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 50%;
+  }
+  .hero .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+  .hero h1 {
+    font-size: 32px;
+    font-weight: 800;
+    margin-bottom: 12px;
+    position: relative;
+    z-index: 1;
+  }
+  .hero p {
+    font-size: 16px;
+    opacity: 0.85;
+    max-width: 700px;
+    position: relative;
+    z-index: 1;
+  }
+  .hero-meta {
+    margin-top: 20px;
+    display: flex;
+    gap: 24px;
+    position: relative;
+    z-index: 1;
+  }
+  .hero-meta span {
+    font-size: 13px;
+    opacity: 0.75;
+  }
+  
+  /* Section Styling */
+  .section {
+    background: white;
+    border-radius: 12px;
+    padding: 36px 40px;
+    margin-bottom: 28px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .section h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #0D47A1;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 3px solid #E3F2FD;
+  }
+  .section h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1565C0;
+    margin: 24px 0 10px;
+  }
+  .section p { margin-bottom: 14px; }
+  
+  /* Key Takeaway Cards */
+  .takeaways {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+  .takeaway-card {
+    background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
+    border-left: 5px solid #1565C0;
+    border-radius: 8px;
+    padding: 20px 24px;
+    position: relative;
+  }
+  .takeaway-card.warning {
+    background: linear-gradient(135deg, #FFEBEE, #FFCDD2);
+    border-left-color: #C62828;
+  }
+  .takeaway-card.success {
+    background: linear-gradient(135deg, #E8F5E9, #C8E6C9);
+    border-left-color: #2E7D32;
+  }
+  .takeaway-card.info {
+    background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+    border-left-color: #E65100;
+  }
+  .takeaway-card .num {
+    font-size: 28px;
+    font-weight: 800;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .takeaway-card.warning .num { color: #C62828; }
+  .takeaway-card.success .num { color: #2E7D32; }
+  .takeaway-card.info .num { color: #E65100; }
+  .takeaway-card.normal .num { color: #1565C0; }
+  .takeaway-card .desc {
+    font-size: 14px;
+    color: #37474F;
+    line-height: 1.5;
+  }
+  
+  /* Data Table */
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  table.data-table th {
+    background: #1565C0;
+    color: white;
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  table.data-table th:first-child { border-radius: 8px 0 0 0; }
+  table.data-table th:last-child { border-radius: 0 8px 0 0; }
+  table.data-table td {
+    padding: 11px 16px;
+    border-bottom: 1px solid #EEEEEE;
+    vertical-align: top;
+  }
+  table.data-table tr:nth-child(even) { background: #FAFAFA; }
+  table.data-table tr:hover { background: #F5F5F5; }
+  
+  /* Status Badges */
+  .status {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .status.met { background: #E8F5E9; color: #2E7D32; }
+  .status.not-met { background: #FFEBEE; color: #C62828; }
+  .status.monitoring { background: #FFF3E0; color: #E65100; }
+  .status.dependent { background: #F3E5F5; color: #7B1FA2; }
+  .status.referenced { background: #E3F2FD; color: #1565C0; }
+  .status.data-issue { background: #ECEFF1; color: #455A64; }
+  
+  /* Image blocks */
+  .chart-block {
+    margin: 28px 0;
+    text-align: center;
+  }
+  .chart-block img {
+    max-width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  }
+  .chart-caption {
+    font-size: 13px;
+    color: #78909C;
+    margin-top: 10px;
+    font-style: italic;
+  }
+  
+  /* Insight boxes */
+  .insight-box {
+    background: #FFFDE7;
+    border-left: 4px solid #F9A825;
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 14px;
+  }
+  .insight-box strong {
+    color: #F57F17;
+  }
+  
+  .hospital-detail {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 16px;
+  }
+  .hospital-card {
+    background: #F8FAFC;
+    border: 1px solid #E0E0E0;
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .hospital-card h4 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .hospital-card ul {
+    list-style: none;
+    padding: 0;
+  }
+  .hospital-card li {
+    font-size: 13px;
+    padding: 4px 0;
+    padding-left: 18px;
+    position: relative;
+  }
+  .hospital-card li::before {
+    content: '\25b8';
+    position: absolute;
+    left: 0;
+    color: #1565C0;
+    font-weight: bold;
+  }
+  
+  .footer {
+    text-align: center;
+    padding: 32px;
+    color: #90A4AE;
+    font-size: 13px;
+  }
+  
+  @media (max-width: 768px) {
+    .container { padding: 20px 12px 40px; }
+    .hero { padding: 32px 24px; }
+    .hero h1 { font-size: 24px; }
+    .section { padding: 24px 20px; }
+    .hospital-detail { grid-template-columns: 1fr; }
+    .takeaways { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ====== HERO HEADER ====== -->
+  <div class="hero">
+    <div class="badge">National Audit of Pulmonary Hypertension</div>
+    <h1>NAPH Local Action Plan — 10th Annual Report Analysis</h1>
+    <p>A comparative analysis of pulmonary hypertension quality standards compliance across four NHS specialist centres: Royal Brompton, Newcastle, Imperial, and Sheffield.</p>
+    <div class="hero-meta">
+      <span><strong>Report Date:</strong> 10 August 2026</span>
+      <span><strong>Data Sources:</strong> 4 Hospital Action Plans</span>
+      <span><strong>Standards Audited:</strong> 4 (Pg 19, Pg 23 × 2, Pg 35)</span>
+    </div>
+  </div>
+
+  <!-- ====== KEY TAKEAWAYS ====== -->
+  <div class="section">
+    <h2>What Matters Most</h2>
+    <div class="takeaways">
+      <div class="takeaway-card warning">
+        <span class="num">79%</span>
+        <span class="desc"><strong>Sheffield failed its target</strong> for PAH drug therapy initiation — dropping from 87% (2016–17) to just below the 80% threshold in 2018–19. A clear downward trend requiring immediate intervention.</span>
+      </div>
+      <div class="takeaway-card normal">
+        <span class="num">4 / 4</span>
+        <span class="desc"><strong>All four centres referenced Page&nbsp;35</strong> — the CTEPH surgery waiting-time standard. This is the most universally acknowledged challenge across the NAPH audit, indicating a systemic national-level bottleneck rather than a local failure.</span>
+      </div>
+      <div class="takeaway-card info">
+        <span class="num">Pg 35</span>
+        <span class="desc"><strong>Cross-centre dependency on Royal Papworth.</strong> Every hospital's action plan for surgical waiting times defers to or coordinates with the centralised endarterectomy service at Royal Papworth, signalling that this standard cannot be met without national coordination.</span>
+      </div>
+      <div class="takeaway-card success">
+        <span class="num">Imperial</span>
+        <span class="desc"><strong>Documentation gap identified.</strong> All cases previously recorded as missing cardiac catheterisation were found to have undergone the procedure externally. Actual clinical compliance was likely higher than reported, highlighting a data-quality issue rather than a care-delivery failure.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== DATA SNAPSHOT ====== -->
+  <div class="section">
+    <h2>Data Snapshot</h2>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Dimension</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Hospitals Covered</strong></td>
+          <td>Royal Brompton, Newcastle, Imperial, Sheffield</td>
+        </tr>
+        <tr>
+          <td><strong>Total Standard Entries</strong></td>
+          <td>7 entries across all four centres (each centre addresses 1–2 distinct standards)</td>
+        </tr>
+        <tr>
+          <td><strong>Distinct Standards</strong></td>
+          <td>Page&nbsp;19 (Diagnosis Recording), Page&nbsp;23 Drug Therapy Initiation, Page&nbsp;23 Cardiac Catheterisation Documentation, Page&nbsp;35 (CTEPH Surgery Waiting Time)</td>
+        </tr>
+        <tr>
+          <td><strong>Standard Thresholds</strong></td>
+          <td>Pg&nbsp;19: 95% &nbsp;|&nbsp; Pg&nbsp;23 (Drug Therapy): 80% &nbsp;|&nbsp; Pg&nbsp;23 (Cath): 95% &nbsp;|&nbsp; Pg&nbsp;35: 90%</td>
+        </tr>
+        <tr>
+          <td><strong>Standards Failed</strong></td>
+          <td>1 of 2 auditable (Sheffield Pg&nbsp;23 Drug Therapy: 79% vs 80% target)</td>
+        </tr>
+        <tr>
+          <td><strong>Date Range</strong></td>
+          <td>Trend data available for Sheffield from 2016–17 through 2018–19</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ====== CHART 1: Overview ====== -->
+  <div class="section">
+    <h2>Hospital Standards Coverage and Performance</h2>
+    <p>The chart below maps which standards each hospital addresses, shows the distribution of target thresholds, highlights Sheffield's declining performance trajectory, identifies the range of improvement actions being taken, and synthesises cross-cutting patterns across all four centres.</p>
+    
+    <div class="chart-block">
+      <img src="/api/v1/files/content?url=/workspace/GenReport/backend/data/workspaces/36/naph_analysis_overview.png" alt="NAPH Analysis Overview – Standards coverage, targets, trends, and action types">
+      <p class="chart-caption">Figure 1. Composite overview of standards coverage, target thresholds, Sheffield's year-on-year trend, action-type distribution, and cross-hospital synthesis.</p>
+    </div>
+
+    <h3>Reading the Chart</h3>
+    <ul style="margin-left: 20px; margin-bottom: 16px;">
+      <li><strong>(A) Standards Covered:</strong> Every hospital addresses the Page&nbsp;35 CTEPH standard (shaded column). Royal Brompton focuses solely on it; the other three centres each address one additional local standard alongside it.</li>
+      <li><strong>(B) Target Thresholds:</strong> Two standards demand very high compliance (95%), reflecting their importance for patient safety and documentation integrity.</li>
+      <li><strong>(C) Sheffield Trend:</strong> The red bar for 2018–19 shows Sheffield falling below the 80% threshold by a narrow margin — a drop of 8 percentage points over three years.</li>
+      <li><strong>(D) Cross-Centre Mentions:</strong> The CTEPH surgery standard is mentioned by all four hospitals, confirming it as the dominant shared challenge.</li>
+    </ul>
+  </div>
+
+  <!-- ====== DETAILED FINDINGS ====== -->
+  <div class="section">
+    <h2>Detailed Findings by Standard</h2>
+    
+    <h3>1. Page 35 — CTEPH Surgery Waiting Time (All 4 Centres)</h3>
+    <p><strong>Standard:</strong> 90% of patients undergoing pulmonary endarterectomy should wait less than four months from diagnosis of chronic thromboembolic pulmonary hypertension (CTEPH).</p>
+    
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Centre</th>
+          <th>Status</th>
+          <th>Action Planned</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Royal Brompton</strong></td>
+          <td><span class="status referenced">Referenced</span></td>
+          <td>Continues local patient tracking; aims to adopt a virtual MDT with Royal Papworth to accelerate surgical decision-making.</td>
+        </tr>
+        <tr>
+          <td><strong>Newcastle</strong></td>
+          <td><span class="status dependent">Dependent</span></td>
+          <td>Defers to Royal Papworth response — outcome outside local control.</td>
+        </tr>
+        <tr>
+          <td><strong>Imperial</strong></td>
+          <td><span class="status dependent">Dependent</span></td>
+          <td>Defers to Royal Papworth response.</td>
+        </tr>
+        <tr>
+          <td><strong>Sheffield</strong></td>
+          <td><span class="status monitoring">Being Addressed</span></td>
+          <td>Working directly with Royal Papworth; appointed an additional secretary to reduce administrative delays; has dedicated nursing staff monitoring the pathway; investigating coronary angiography wait times.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="insight-box">
+      <strong>Key Insight:</strong> Three of four centres defer to Royal Papworth for this standard, making it effectively a centrally-managed benchmark. Only Royal Brompton and Sheffield propose concrete local mitigation steps (virtual MDT adoption, capacity investment). The structural nature of this bottleneck — a single national endarterectomy centre serving referrals from across the country — means individual centre action plans can only do so much without system-wide redesign.
+    </div>
+
+    <h3>2. Page 23 — PAH Drug Therapy Initiation Timeliness (Sheffield)</h3>
+    <p><strong>Standard:</strong> 80% of new referrals diagnosed with idiopathic, heritable, anorexigen-induced, or connective tissue disease-associated PAH who are in WHO functional class II–IV should commence drug therapy within 12 weeks of first referral.</p>
+    
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>2016–17</td><td><strong>87%</strong> <span class="status met">&check; Met</span></td></tr>
+        <tr><td>2017–18</td><td><strong>86%</strong> <span class="status met">&check; Met</span></td></tr>
+        <tr><td>2018–19</td><td><strong>79%</strong> <span class="status not-met">&cross; Not Met</span></td></tr>
+        <tr><td><strong>Target</strong></td><td><strong>≥ 80%</strong></td></tr>
+        <tr><td><strong>Decline</strong></td><td><strong style="color:#C62828;">−8 pp over 3 years; −1 pp in final year alone</strong></td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>Actions taken by Sheffield:</strong></p>
+    <ul style="margin-left: 20px; margin-bottom: 16px;">
+      <li>Identified the need for a dedicated staff member to track patients through the treatment initiation pathway.</li>
+      <li>Undertaking a comprehensive review of service capacity.</li>
+      <li>Appointed an additional medical consultant in October 2019 to expand service capacity.</li>
+    </ul>
+
+    <div class="insight-box">
+      <strong>Key Insight:</strong> Sheffield's decline from 87% to 79% represents the only documented failure among all auditable standards across these four centres. The rate of deterioration has actually accelerated: a 1-point drop between 2016–17 and 2017–18 versus a 7-point plunge in the following year. The response — hiring additional clinical and administrative staff — is appropriate but will take time to translate into measurable improvement. QoI progress for 2019–20 and beyond is critical to confirm whether the trend reverses.
+    </div>
+  </div>
+
+  <!-- ====== CHART 2: Detailed ====== -->
+  <div class="section">
+    <h2>Action Mapping and Compliance Dashboard</h2>
+    <p>The figure below breaks down the specific improvement actions each hospital has committed to, visualises Sheffield's trajectory against its target, provides a real-time compliance status dashboard for each standard, summarises key dataset statistics, and lists the primary action commitments per hospital.</p>
+    
+    <div class="chart-block">
+      <img src="/api/v1/files/content?url=/workspace/GenReport/backend/data/workspaces/36/naph_detailed_analysis.png" alt="NAPH Detailed Analysis — Action mapping, Sheffield trend, compliance dashboard, statistics, hospital summary">
+      <p class="chart-caption">Figure 2. Stacked action-type matrix, Sheffield performance trend with annotations, compliance dashboard, summary statistics, and per-hospital action commitments.</p>
+    </div>
+  </div>
+
+  <!-- ====== PER-HOSPITAL BREAKDOWN ====== -->
+  <div class="section">
+    <h2>Per-Hospital Breakdown</h2>
+    
+    <div class="hospital-detail">
+      <div class="hospital-card">
+        <h4 style="color:#1565C0;">Royal Brompton</h4>
+        <ul>
+          <li>Addresses 1 standard (Pg&nbsp;35 only)</li>
+          <li>Focuses on local pathway tracking</li>
+          <li>Proposes virtual MDT with Royal Papworth</li>
+          <li>Regularly audits non-compliant patients locally</li>
+        </ul>
+      </div>
+      <div class="hospital-card">
+        <h4 style="color:#00695C;">Newcastle (Freeman Hospital)</h4>
+        <ul>
+          <li>Addresses 2 standards (Pg&nbsp;19 and Pg&nbsp;35)</li>
+          <li>Monitoring all new patient activity for timely diagnosis recording</li>
+          <li>Ensuring database representation matches clinical reality</li>
+          <li>References Royal Papworth for surgery timeline</li>
+        </ul>
+      </div>
+      <div class="hospital-card">
+        <h4 style="color:#6A1B9A;">Imperial</h4>
+        <ul>
+          <li>Addresses 2 standards (Pg&nbsp;23 documentation + Pg&nbsp;35)</li>
+          <li>Investigated apparent catheterisation gaps — all procedures performed externally</li>
+          <li>Committed to quarterly standard reviews</li>
+          <li>Aiming to identify documentation discrepancies closer to time of entry</li>
+        </ul>
+      </div>
+      <div class="hospital-card">
+        <h4 style="color:#C62828;">Sheffield</h4>
+        <ul>
+          <li>Addresses 2 standards (Pg&nbsp;23 drug therapy + Pg&nbsp;35)</li>
+          <li>Only centre with a documented performance failure (79% vs 80%)</li>
+          <li>Largest investment: new consultant, secretary, nursing monitor</li>
+          <li>Examining coronary angiography waiting time barriers</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== CROSS-CUTTING THEMES ====== -->
+  <div class="section">
+    <h2>Cross-Cutting Themes</h2>
+    
+    <h3>Theme 1: Structural Bottleneck at the National Level</h3>
+    <p>The Page&nbsp;35 standard appears in every hospital's action plan because pulmonary endarterectomy is delivered through a single national centre at Royal Papworth. This makes the standard fundamentally different from the others — no individual centre can independently guarantee it. The solution requires rethinking the referral-to-MDT pipeline nationally, potentially through the virtual MDT model proposed by Royal Brompton.</p>
+    
+    <h3>Theme 2: Data Quality Is a Recurring Problem</h3>
+    <p>Imperial's discovery that external cardiac catheterisations were not reflected in their database illustrates a broader challenge: when multi-centre care pathways involve procedures at institutions outside the reporting centre, the receiving centre's audit database may not capture them accurately. Quarterly review cadences and proximity-of-entry verification are reasonable mitigations but suggest the data-collection architecture itself needs strengthening.</p>
+    
+    <h3>Theme 3: Staffing Is the Universal Lever</h3>
+    <p>Across all four hospitals, the primary recommended interventions involve adding human resources — consultants, secretaries, dedicated patient-trackers, and nursing monitors. This pattern suggests that under-resourcing rather than protocol deficiency is the principal constraint on meeting these standards.</p>
+    
+    <h3>Theme 4: Early Warning Signs Are Working (Mostly)</h3>
+    <p>Sheffield's ability to report a three-year trend showing progressive decline demonstrates that the NAPH audit framework is functioning as intended: identifying deteriorating performance before crises occur. The remaining question is whether the interventions can close the gap quickly enough.</p>
+  </div>
+
+  <!-- ====== LIMITATIONS ====== -->
+  <div class="section">
+    <h2>Limitations and Caveats</h2>
+    <ul style="margin-left: 20px;">
+      <li><strong>Limited data scope:</strong> These action-plan extracts cover only the standards that each centre flagged as requiring local remediation. Many centres may meet all standards and therefore have fewer entries in their action plans. Absence of evidence is not evidence of absence.</li>
+      <li><strong>No denominator data:</strong> The reports provide performance percentages but not the underlying patient numbers, making it impossible to assess statistical significance of changes (e.g., whether Sheffield's 79% represents a clinically meaningful change or random variation around 80%).</li>
+      <li><strong>Self-reported data:</strong> Performance figures are self-reported by centres and verified through the NAPH audit process, but the verification methodology (complete data review vs sample-based audit) is not specified here.</li>
+      <li><strong>Time-limited window:</strong> Trend data covers only three financial years (2016–17 through 2018–19), limiting our ability to distinguish a genuine secular trend from cyclical variation.</li>
+      <li><strong>Synthesis limitation:</strong> This analysis synthesises excerpts extracted from full audit documents. Full interpretations should reference the complete published action plans.</li>
+    </ul>
+  </div>
+
+  <!-- ====== RECOMMENDED NEXT STEPS ====== -->
+  <div class="section">
+    <h2>Recommended Next Steps</h2>
+    <ol style="margin-left: 20px;">
+      <li><strong>Monitor Sheffield's 2019–20 results closely.</strong> The centre has committed substantial new staffing; the next annual report will reveal whether these investments are translating into improved drug therapy initiation rates. An improvement above 80% would confirm the effectiveness of the approach.</li>
+      <li><strong>Evaluate the virtual MDT proposal.</strong> If Royal Brompton's proposed virtual multidisciplinary team with Royal Papworth proves viable, it could be replicated across other centres to shorten the diagnosis-to-surgery decision pathway system-wide.</li>
+      <li><strong>Standardise external-procedure capturing.</strong> Implement a formal mechanism for referring centres to receive confirmation of externally-performed investigations (catheterisation, angiography) so that NAPH audit databases reflect the true picture of clinical activity.</li>
+      <li><strong>Expand the analysis to include more centres.</strong> Currently covering 4 of the UK's pulmonary hypertension centres. Including data from the remaining centres (notably the Royal Papworth Hospital itself) would enable full benchmarking and reveal whether Sheffield's decline is an outlier or part of a wider pattern.</li>
+      <li><strong>Calculate statistical confidence intervals.</strong> With known denominators, determine whether year-on-year changes are statistically significant or within expected random variation, enabling more precise resource allocation decisions.</li>
+    </ol>
+  </div>
+
+  <!-- ====== FOOTER ====== -->
+  <div class="footer">
+    <p>Analysis prepared using NAPH LAP 10th Annual Report data from Royal Brompton, Newcastle, Imperial, and Sheffield PH centres.</p>
+    <p>Report generated 10 August 2026. For questions about methodology or data interpretation, contact the NAPH programme office.</p>
+  </div>
+
+</div>
+
+</body>
+</html>

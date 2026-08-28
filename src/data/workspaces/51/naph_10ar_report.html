@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAPH 10th Annual Report — Open Data Specification Schema Analysis</title>
+    <style>
+        :root {
+            --primary: #2C3E50;
+            --secondary: #4A90D9;
+            --accent: #E74C3C;
+            --success: #67B26F;
+            --warning: #F4A460;
+            --bg: #FAFAFA;
+            --card-bg: #FFFFFF;
+            --border: #E0E6ED;
+            --text: #333333;
+            --text-light: #666666;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.7;
+            color: var(--text);
+            background: var(--bg);
+            padding: 40px 20px;
+        }
+        
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        /* Header */
+        .report-header {
+            background: linear-gradient(135deg, var(--primary) 0%, #34495E 100%);
+            color: white;
+            padding: 50px 40px;
+            border-radius: 12px;
+            margin-bottom: 40px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        
+        .report-header h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+        }
+        
+        .report-header .subtitle {
+            font-size: 1.15em;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+        
+        .report-header .date {
+            margin-top: 15px;
+            font-size: 0.95em;
+            opacity: 0.75;
+        }
+        
+        /* Key Findings */
+        .key-findings {
+            background: var(--card-bg);
+            border-left: 5px solid var(--secondary);
+            padding: 30px 35px;
+            border-radius: 0 10px 10px 0;
+            margin-bottom: 40px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        
+        .key-findings h2 {
+            color: var(--primary);
+            font-size: 1.6em;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .key-findings h2::before {
+            content: "📊";
+            font-size: 1.2em;
+        }
+        
+        .findings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .finding-card {
+            background: #F7FAFC;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 18px 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .finding-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .finding-card .number {
+            font-size: 2em;
+            font-weight: 800;
+            color: var(--secondary);
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+        
+        .finding-card .label {
+            font-size: 0.95em;
+            color: var(--text-light);
+        }
+        
+        .finding-card .detail {
+            font-size: 0.9em;
+            color: var(--text-light);
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+        
+        /* Section styles */
+        .section {
+            background: var(--card-bg);
+            padding: 35px 40px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        
+        .section h2 {
+            color: var(--primary);
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+        }
+        
+        .section h3 {
+            color: var(--primary);
+            font-size: 1.2em;
+            margin: 25px 0 15px 0;
+            padding-left: 12px;
+            border-left: 3px solid var(--secondary);
+        }
+        
+        .section p {
+            margin-bottom: 15px;
+            color: var(--text);
+        }
+        
+        /* Chart containers */
+        .chart-container {
+            margin: 30px 0;
+            text-align: center;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        
+        .chart-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 6px;
+        }
+        
+        .chart-caption {
+            margin-top: 12px;
+            font-size: 0.9em;
+            color: var(--text-light);
+            font-style: italic;
+        }
+        
+        /* Tables */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.9em;
+        }
+        
+        .data-table th {
+            background: var(--primary);
+            color: white;
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .data-table tr:nth-child(even) {
+            background: #F7FAFC;
+        }
+        
+        .data-table tr:hover {
+            background: #EBF5FB;
+        }
+        
+        /* Badge styles */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-right: 5px;
+        }
+        
+        .badge-text {
+            background: #EBF5FB;
+            color: #2980B9;
+        }
+        
+        .badge-integer {
+            background: #FDEDEC;
+            color: #C0392B;
+        }
+        
+        .badge-success {
+            background: #EAFAF1;
+            color: #27AE60;
+        }
+        
+        .badge-warning {
+            background: #FEF9E7;
+            color: #D68910;
+        }
+        
+        /* Info boxes */
+        .info-box {
+            background: #EBF5FB;
+            border-left: 4px solid var(--secondary);
+            padding: 18px 22px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .info-box.warning {
+            background: #FEF9E7;
+            border-left-color: var(--warning);
+        }
+        
+        .info-box.success {
+            background: #EAFAF1;
+            border-left-color: var(--success);
+        }
+        
+        .info-box strong {
+            color: var(--primary);
+        }
+        
+        /* Two column layout */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .col-box {
+            background: #F7FAFC;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .col-box h4 {
+            color: var(--primary);
+            margin-bottom: 12px;
+            font-size: 1em;
+        }
+        
+        /* List styles */
+        .styled-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .styled-list li {
+            padding: 8px 0 8px 25px;
+            position: relative;
+        }
+        
+        .styled-list li::before {
+            content: "▸";
+            position: absolute;
+            left: 5px;
+            color: var(--secondary);
+            font-weight: bold;
+        }
+        
+        /* Code-like elements */
+        code {
+            background: #F0F4F8;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #C0392B;
+        }
+        
+        /* Footer */
+        .report-footer {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-light);
+            font-size: 0.85em;
+            border-top: 1px solid var(--border);
+            margin-top: 40px;
+        }
+        
+        @media (max-width: 768px) {
+            .two-col { grid-template-columns: 1fr; }
+            .findings-grid { grid-template-columns: 1fr; }
+            .section { padding: 25px 20px; }
+            .report-header { padding: 30px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <!-- HEADER -->
+        <header class="report-header">
+            <h1>NAPH 10th Annual Report</h1>
+            <p class="subtitle">Open Data Specification — Schema Analysis &amp; Structure Report</p>
+            <p class="date">Generated on August 11, 2026</p>
+        </header>
+        
+        <!-- KEY FINDINGS -->
+        <section class="key-findings">
+            <h2>What Matters Most</h2>
+            <div class="findings-grid">
+                <div class="finding-card">
+                    <div class="number">16</div>
+                    <div class="label">Total Schema Fields</div>
+                    <div class="detail">The dataset definition comprises 16 fields spanning organisation metadata, clinical measurements, standards compliance, and temporal context.</div>
+                </div>
+                <div class="finding-card">
+                    <div class="number">87.5%</div>
+                    <div class="label">Text-Based Fields</div>
+                    <div class="detail">14 out of 16 fields are Text type, indicating the data is primarily categorical or descriptive rather than raw numeric measurements.</div>
+                </div>
+                <div class="finding-card">
+                    <div class="number">12</div>
+                    <div class="label">Value Measurement Types</div>
+                    <div class="detail">The DataType field supports 12 distinct value types including flags, percentages, and comprehensive week-statistics (average through quartiles).</div>
+                </div>
+                <div class="finding-card">
+                    <div class="number">4</div>
+                    <div class="label">Section Categories</div>
+                    <div class="detail">Data is organized into four logical sections: National Standard, National Standard Summary, Reference Tables, and Survival Analysis.</div>
+                </div>
+                <div class="finding-card">
+                    <div class="number">8</div>
+                    <div class="label">Time Point Classifications</div>
+                    <div class="detail">WhenOccurred provides 8 variants for precisely locating events within audit periods, including offset-based and diagnosis-timeline approaches.</div>
+                </div>
+                <div class="finding-card">
+                    <div class="number">3</div>
+                    <div class="label">Standard Compliance States</div>
+                    <div class="detail">Standard_Met uses three response values (Yes / No / N/A) to indicate whether measured values meet national standards.</div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- DATA OVERVIEW -->
+        <section class="section">
+            <h2>Data Overview</h2>
+            
+            <div class="two-col">
+                <div class="col-box">
+                    <h4>📋 Dataset Identity</h4>
+                    <ul class="styled-list">
+                        <li><strong>Source:</strong> 10th NAPH Annual Report</li>
+                        <li><strong>Content Type:</strong> Open Data Specification Schema</li>
+                        <li><strong>Total Rows:</strong> 16 field definitions + guidance notes</li>
+                        <li><strong>Format:</strong> CSV (Latin-1 encoded)</li>
+                        <li><strong>Encoding Issue:</strong> Unicode decode error at byte 0x96 (en-dash in "Kaplan–Meier")</li>
+                    </ul>
+                </div>
+                <div class="col-box">
+                    <h4>🏥 Domain Context</h4>
+                    <ul class="styled-list">
+                        <li><strong>Domain:</strong> Prostate Health Auditing (NAPH)</li>
+                        <li><strong>Audit Period:</strong> March-to-April fiscal years</li>
+                        <li><strong>Coverage:</strong> Primary Healthcare (PH) Centres across England</li>
+                        <li><strong>Special Code:</strong> "SGC" = Golden Jubilee Hospital</li>
+                        <li><strong>Purpose:</strong> National standards compliance monitoring</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="info-box warning">
+                <strong>⚠️ Important Note:</strong> This file is a <em>schema specification document</em>, not raw clinical data. It defines the structure, field names, data types, valid value ranges, and formatting rules for the actual NAPH open data tables. To analyze patient-level or centre-level metrics, you would need the corresponding data files that use this specification as their schema.
+            </div>
+        </section>
+        
+        <!-- FIELD ANALYSIS -->
+        <section class="section">
+            <h2>Field Composition Analysis</h2>
+            
+            <h3>Complete Field Registry</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Field Name</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th>Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td><code>Section</code></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>Categorizes data into major sections of the annual report</td>
+                        <td>Classification: National Standard, Summary, Reference Tables, Survival Analysis</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td><code>Output_Reference</code></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>Table/chart number in the annual report</td>
+                        <td>Navigation: links data rows to specific outputs in the published report</td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td><code>Output_Description</code></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>Detailed description of each table/chart/standard</td>
+                        <td>Semantic meaning: explains what each output measures</td>
+                    </tr>
+                    <tr>
+                        <td>4</td>
+                        <td><code>Period</code></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>Period of assessment (e.g., "2019", "2018-19")</td>
+                        <td>Temporal: broad time frame for the data collection</td>
+                    </tr>
+                    <tr>
+                        <td>5</td>
+                        <td><code>WhenOccurred</code></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>Point within the Period when the event occurred</td>
+                        <td>Temporal precision: distinguishes single dates vs. spans vs. offsets</td>
+                    </tr>
+                    <tr>
+                        <td>6</td>
+                        <td><code>Organisation_Code</code></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>Code identifier for PH centres</td>
+                        <td>Entity: unique centre identification</td>
+                    </tr>
+                    <tr>
+                        <td>7</td>
+                        <td><code>Organisation_Name</code></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>Short name of PH centre</td>
+                        <td>Human-readable centre identification</td>
+                    </tr>
+                    <tr>
+                        <td>8</td>
+                        <td><code>Identifier</code></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>Description of the Value being recorded</td>
+                        <td>Semantic: pairs with Output_Description for full context</td>
+                    </tr>
+                    <tr>
+                        <td>9</td>
+                        <td><code>DataType</code></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>Type of Value measurement</td>
+                        <td>Parsing instruction: tells consumers how to interpret the Value field</td>
+                    </tr>
+                    <tr>
+                        <td>10</td>
+                        <td><code>Value</code></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>The measured or observed value</td>
+                        <td>Core metric: primary data value</td>
+                    </tr>
+                    <tr>
+                        <td>11</td>
+                        <td><code>Standard_Target</code></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>Target value for NAPH National Standards</td>
+                        <td>Benchmark: quality threshold for comparison</td>
+                    </tr>
+                    <tr>
+                        <td>12</td>
+                        <td><code>Standard_Met</code></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>Whether Value met/exceeded Standard_Target</td>
+                        <td>Compliance flag: Yes / No / N/A</td>
+                    </tr>
+                    <tr>
+                        <td>13</td>
+                        <td><code>Value_Denominator</code></td>
+                        <td><span class="badge badge-integer">Integer</span></td>
+                        <td>Denominator for percentage calculations</td>
+                        <td>Reproducibility: enables recalculation of percentages</td>
+                    </tr>
+                    <tr>
+                        <td>14</td>
+                        <td><code>Value_Numerator</code></td>
+                        <td><span class="badge badge-integer">Integer</span></td>
+                        <td>Numerator for percentage calculations</td>
+                        <td>Reproducibility: enables recalculation of percentages</td>
+                    </tr>
+                    <tr>
+                        <td>15</td>
+                        <td><code>OrderId</code></td>
+                        <td><span class="badge badge-integer">Integer</span></td>
+                        <td>Sort order for intuitive row arrangement</td>
+                        <td>Presentation: ensures human-friendly ordering when sorted ascending</td>
+                    </tr>
+                    <tr>
+                        <td>16</td>
+                        <td><em>Guidance Notes</em></td>
+                        <td><span class="badge badge-text">Text</span></td>
+                        <td>5 examples clarifying Period/WhenOccurred usage</td>
+                        <td>Documentation: helps data consumers correctly pair temporal fields</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+        
+        <!-- PATTERN 1: DATA TYPE DISTRIBUTION -->
+        <section class="section">
+            <h2>Pattern 1: Predominantly Categorical, Text-Based Design</h2>
+            
+            <p>The schema is overwhelmingly <strong>Text-type (87.5%)</strong> with only 2 Integer fields (Value_Denominator and Value_Numerator). This design choice serves several purposes:</p>
+            
+            <ul class="styled-list">
+                <li><strong>Flexibility:</strong> The Value field accommodates diverse formats—flags, integers, decimals, percentages, and textual descriptions—all stored uniformly as Text.</li>
+                <li><strong>Cross-domain compatibility:</strong> Different clinical metrics (survival rates, wait times, treatment percentages) can share the same data structure.</li>
+                <li><strong>Percentage transparency:</strong> By keeping Numerator and Denominator as separate Integer fields alongside the computed Text-based Percentage, the schema enables independent verification of all calculated values.</li>
+            </ul>
+            
+            <div class="chart-container">
+                <img src="/api/v1/files/content?url=/workspace/GenReport/backend/data/workspaces/51/naph_schema_analysis.png" alt="Schema Analysis Dashboard showing field types, data categories, and entity relationships">
+                <p class="chart-caption">Figure 1: Comprehensive schema analysis covering field types (14 Text, 2 Integer), WhenOccurred variants (8 options), DataType categories (12 types), entity relationships, standard compliance states, and summary statistics.</p>
+            </div>
+            
+            <div class="info-box success">
+                <strong>💡 Design Insight:</strong> The schema follows a <em>"wide schema"</em> pattern common in UK NHS open data—embedding metadata (organisation, timing, classification) directly alongside measurements rather than joining multiple tables. This makes individual rows self-contained and easier to publish.
+            </div>
+        </section>
+        
+        <!-- PATTERN 2: TIME ARCHITECTURE -->
+        <section class="section">
+            <h2>Pattern 2: Sophisticated Time Architecture with 8 Variants</h2>
+            
+            <p>The <code>WhenOccurred</code> field is one of the most complex aspects of this schema, supporting <strong>8 distinct temporal classifications</strong>:</p>
+            
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>WhenOccurred Value</th>
+                        <th>Use Case</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Audit Year</strong></td>
+                        <td>Events occurring within the full audit year period</td>
+                        <td>All prostate screenings conducted during 2018–19</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Audit Period</strong></td>
+                        <td>Multi-year aggregated events spanning a range</td>
+                        <td>Treatment rates aggregated from 2009-10 to 2018-19</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Audit Year offset -6 months</strong></td>
+                        <td>One-year window starting 6 months before audit year</td>
+                        <td>Follow-up data starting September of preceding year</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Audit Year offset -12 weeks</strong></td>
+                        <td>Recent quarter prior to audit year cutoff</td>
+                        <td>Q4 data before the March financial year end</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Audit Year offset -30 days</strong></td>
+                        <td>One month before audit year ends</td>
+                        <td>Last month of activity before April cutoff</td>
+                    </tr>
+                    <tr>
+                        <td><strong>March 31</strong></td>
+                        <td>Specific date matching financial year end</td>
+                        <td>Stock figures as of 31 March (year-end snapshot)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Days since diagnosis</strong></td>
+                        <td>Relative time from patient diagnosis</td>
+                        <td>Survival analysis: outcomes at day 30, 90, 365</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Years since diagnosis</strong></td>
+                        <td>Longitudinal follow-up intervals</td>
+                        <td>5-year survival rate, 10-year progression</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div class="info-box">
+                <strong>⏱️ Key Rule:</strong> An audit year runs from <strong>March to April</strong>. This means "2018–19 Audit Year" covers roughly 1 April 2018 through 31 March 2019—not calendar year dates. All five guidance examples in the specification are designed to help data consumers correctly interpret this convention.
+            </div>
+            
+            <div class="chart-container">
+                <img src="/api/v1/files/content?url=/workspace/GenReport/backend/data/workspaces/51/naph_time_analysis.png" alt="Time and Period Architecture diagram showing field mapping and temporal relationships">
+                <p class="chart-caption">Figure 2: Complete field mapping (all 16 fields with types and descriptions) and the Time & Period Architecture showing how Period and WhenOccurred combine to define precise event timing across different analytical contexts.</p>
+            </div>
+            
+            <h3>Why This Complexity?</h3>
+            <p>Prostate health auditing involves multiple temporal perspectives:</p>
+            <ul class="styled-list">
+                <li><strong>Operational metrics</strong> (waiting times, throughput) use narrow windows like "Audit Year offset -30 days"</li>
+                <li><strong>Trends over time</strong> require multi-year spans like "Audit Period" combining several fiscal years</li>
+                <li><strong>Clinical outcomes</strong> such as survival rates depend entirely on patient-specific timelines ("Days/Years since diagnosis")</li>
+            </ul>
+            <p>This flexibility allows a single schema to serve both <em>operational auditing</em> and <em>clinical research</em> use cases.</p>
+        </section>
+        
+        <!-- PATTERN 3: MEASUREMENT TYPES -->
+        <section class="section">
+            <h2>Pattern 3: Rich Measurement System with 12 DataType Options</h2>
+            
+            <p>The <code>DataType</code> field is critical—it tells any consumer how to parse and interpret the <code>Value</code> field. There are <strong>12 distinct measurement types</strong> defined:</p>
+            
+            <div class="two-col">
+                <div class="col-box">
+                    <h4>📊 Simple Value Types (5)</h4>
+                    <ul class="styled-list">
+                        <li><code>Flag</code> — Binary yes/no indicator</li>
+                        <li><code>n</code> — Whole number count</li>
+                        <li><code>n.n</code> — Decimal number (single precision)</li>
+                        <li><code>%</code> — Percentage value</li>
+                        <li><code>Text</code> — Free-form string</li>
+                    </ul>
+                </div>
+                <div class="col-box">
+                    <h4>📈 Week Statistics (7)</h4>
+                    <ul class="styled-list">
+                        <li><code>Weeks: Average</code> — Mean waiting/wait time</li>
+                        <li><code>Weeks: Minimum</code> — Shortest interval</li>
+                        <li><code>Weeks: Lower quartile</code> — 25th percentile</li>
+                        <li><code>Weeks: Median</code> — 50th percentile (p50)</li>
+                        <li><code>Weeks: Upper quartile</code> — 75th percentile</li>
+                        <li><code>Weeks: Maximum (capped)</code> — Max capped at 1.5×IQR above UQ</li>
+                        <li><code>Weeks: Out of range</code> — Flagged outliers (&gt;1.5×IQR above UQ)</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="info-box warning">
+                <strong>📏 Statistical Rigor:</strong> The week statistics implement proper outlier detection using the Interquartile Range (IQR) method. Values exceeding Q3 + 1.5×IQR are flagged separately as "Out of range" while also appearing in a capped "Maximum" field. This dual-reporting prevents extreme outliers from skewing visualizations while preserving data integrity.
+            </div>
+        </section>
+        
+        <!-- PATTERN 4: STANDARDS COMPLIANCE -->
+        <section class="section">
+            <h2>Pattern 4: Built-in Standards Compliance Framework</h2>
+            
+            <p>The schema embeds <strong>NAPH National Standards</strong> directly into its structure through three dedicated fields:</p>
+            
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Field</th>
+                        <th>Role</th>
+                        <th>Example Scenario</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>Standard_Target</code></td>
+                        <td>Defines the benchmark value</td>
+                        <td>95% of patients seen within 62 days</td>
+                    </tr>
+                    <tr>
+                        <td><code>Value</code></td>
+                        <td>Holds the observed measurement</td>
+                        <td>Actual rate = 91% for a specific centre</td>
+                    </tr>
+                    <tr>
+                        <td><code>Standard_Met</code></td>
+                        <td>Auto-calculated compliance flag</td>
+                        <td>"No" — centre missed target by 4 percentage points</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <p>The <code>Standard_Met</code> field uses exactly <strong>three possible values</strong>:</p>
+            
+            <div style="display: flex; gap: 15px; justify-content: center; margin: 25px 0;">
+                <div style="background: #EAFAF1; border: 2px solid #27AE60; border-radius: 10px; padding: 18px 30px; text-align: center; flex: 1; max-width: 200px;">
+                    <div style="font-size: 2.5em; margin-bottom: 5px;">✅</div>
+                    <div style="font-size: 1.2em; font-weight: 700; color: #27AE60;">Yes</div>
+                    <div style="font-size: 0.85em; color: #666;">Met target</div>
+                </div>
+                <div style="background: #FDEDEC; border: 2px solid #E74C3C; border-radius: 10px; padding: 18px 30px; text-align: center; flex: 1; max-width: 200px;">
+                    <div style="font-size: 2.5em; margin-bottom: 5px;">❌</div>
+                    <div style="font-size: 1.2em; font-weight: 700; color: #E74C3C;">No</div>
+                    <div style="font-size: 0.85em; color: #666;">Missed target</div>
+                </div>
+                <div style="background: #F4F6F6; border: 2px solid #95A5A6; border-radius: 10px; padding: 18px 30px; text-align: center; flex: 1; max-width: 200px;">
+                    <div style="font-size: 2.5em; margin-bottom: 5px;">❓</div>
+                    <div style="font-size: 1.2em; font-weight: 700; color: #7F8C8D;">N/A</div>
+                    <div style="font-size: 0.85em; color: #666;">Not applicable</div>
+                </div>
+            </div>
+            
+            <p>This design enables <strong>automated scoring</strong>—every data consumer can instantly identify which centres meet standards without performing manual comparisons against the target values.</p>
+        </section>
+        
+        <!-- PATTERN 5: ORGANISATIONAL STRUCTURE -->
+        <section class="section">
+            <h2>Pattern 5: Organisation Identification with Special Codes</h2>
+            
+            <p>Two fields handle organisation identity in parallel:</p>
+            
+            <div class="two-col">
+                <div class="col-box">
+                    <h4><code>Organisation_Code</code></h4>
+                    <ul class="styled-list">
+                        <li>Machine-parseable unique identifier</li>
+                        <li>Enables programmatic joins and filtering</li>
+                        <li>Uses dummy code <strong>"SGC"</strong> for Golden Jubilee Hospital</li>
+                        <li>Consistent with NHS Trust coding conventions</li>
+                    </ul>
+                </div>
+                <div class="col-box">
+                    <h4><code>Organisation_Name</code></h4>
+                    <ul class="styled-list">
+                        <li>Human-readable short name</li>
+                        <li>Appears in charts and published reports</li>
+                        <li>Maps to Glossary entries in the annual report</li>
+                        <li>"Specialist PH centres" referenced explicitly</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <strong>🏥 Domain-Specific Detail:</strong> The explicit mention of <em>"Golden Jubilee Hospital"</em> with code "SGC" reflects the schema's real-world grounding. This hospital is a specialist provider of prostate cancer treatments in Scotland, included in national audits despite being outside typical NHS trust structures.
+            </div>
+        </section>
+        
+        <!-- PATTERN 6: SECTION CLASSIFICATION -->
+        <section class="section">
+            <h2>Pattern 6: Four-Way Section Classification</h2>
+            
+            <p>The <code>Section</code> field segments all data into four categories, each serving a different purpose in the annual report:</p>
+            
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Section</th>
+                        <th>Purpose</th>
+                        <th>Typical Content</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>National Standard</strong></td>
+                        <td>Mandatory compliance indicators</td>
+                        <td>Wait times, survival rates, referral targets</td>
+                    </tr>
+                    <tr>
+                        <td><strong>National Standard Summary</strong></td>
+                        <td>Aggregated overview of standards performance</td>
+                        <td>Summary tables, pass/fail counts by region</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Reference Tables</strong></td>
+                        <td>Detailed breakdowns for deeper analysis</td>
+                        <td>Centre-level detail, trend data by year</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Survival Analysis</strong></td>
+                        <td>Kaplan-Meier curves and related statistics</td>
+                        <td>5-year/10-year survival probabilities, hazard ratios</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <p>This classification matters because it determines which <code>DataType</code> values are applicable—survival analysis uses different formats (percentages derived from Kaplan-Meier curves) compared to standard operational metrics.</p>
+        </section>
+        
+        <!-- RECOMMENDATIONS -->
+        <section class="section">
+            <h2>Recommendations for Data Users</h2>
+            
+            <div class="two-col">
+                <div class="col-box" style="border-left: 4px solid var(--success);">
+                    <h4>✅ Recommended Approaches</h4>
+                    <ul class="styled-list">
+                        <li><strong>Parse numerically first:</strong> Convert Value to numeric where DataType ∈ {n, n.n, %}, treating Text values separately</li>
+                        <li><strong>Leverage numerator/denominator:</strong> Recalculate percentages independently to verify reported values</li>
+                        <li><strong>Group by Section:</strong> Apply different parsing rules per Section (survival vs. operational metrics)</li>
+                        <li><strong>Respect audit year boundaries:</strong> Never assume calendar year alignment</li>
+                        <li><strong>Handle outlier flagging:</strong> Use the separate "Weeks: Out of range" count when computing averages</li>
+                    </ul>
+                </div>
+                <div class="col-box" style="border-left: 4px solid var(--warning);">
+                    <h4>⚠️ Watch Outs</h4>
+                    <ul class="styled-list">
+                        <li><strong>Coding issues:</strong> File requires Latin-1 encoding (contains en-dashes)</li>
+                        <li><strong>Missing context:</strong> Without the companion data files, this schema is purely structural</li>
+                        <li><strong>Kaplan-Meier exception:</strong> Some percentages don't have numerator/denominator available</li>
+                        <li><strong>Offset semantics:</strong> Understand whether "-6 months" refers to start-of-window or end-of-window</li>
+                        <li><strong>Version awareness:</strong> This is specifically the 10th edition; field definitions may change across editions</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <h3>Suggested Next Steps</h3>
+            <ul class="styled-list">
+                <li><strong>Pair with actual data files</strong> from the NAPH 10th Annual Report to validate schema against real observations</li>
+                <li><strong>Build automated parsers</strong> that branch logic based on DataType and Section values</li>
+                <li><strong>Create dashboard queries</strong> using Standard_Met for quick compliance overviews</li>
+                <li><strong>Compare across editions</strong> (9th → 10th) to track schema evolution and new metrics</li>
+                <li><strong>Explore temporal patterns</strong> across the 8 WhenOccurred variants for longitudinal trend analysis</li>
+            </ul>
+        </section>
+        
+        <!-- METHODS -->
+        <section class="section">
+            <h2>Methods & Limitations</h2>
+            
+            <h3>Analysis Approach</h3>
+            <p>This analysis examined the NAPH 10th Annual Report Open Data specification file—a CSV schema definition containing 16 field definitions plus guidance documentation. The approach involved:</p>
+            
+            <ol style="margin: 15px 0 15px 25px;">
+                <li><strong>Structural parsing</strong> — Extracting all field names, types, descriptions, valid values, and constraints</li>
+                <li><strong>Categorical enumeration</strong> — Counting distinct options in enumerated fields (Section, DataType, WhenOccurred, Standard_Met)</li>
+                <li><strong>Relationship mapping</strong> — Identifying which fields depend on others (e.g., DataType governs Value interpretation; Numerator/Denominator governs percentage validation)</li>
+                <li><strong>Domain contextualization</strong> — Interpreting the schema within the UK prostate health auditing framework (NAPH, PH centres, Golden Jubilee)</li>
+            </ol>
+            
+            <h3>Limitations</h3>
+            <ul class="styled-list">
+                <li>This is a <strong>schema-only analysis</strong>. No clinical measurements, centre-level data, or temporal trends were available for statistical analysis.</li>
+                <li>The file contains <strong>metadata about data</strong>, not data itself. Insights describe structure and design intent rather than clinical patterns.</li>
+                <li><strong>Unicode handling:</strong> The original file uses Latin-1 encoding (not UTF-8), requiring special handling for characters like the en-dash in "Kaplan–Meier".</li>
+                <li><strong>No field relationships</strong> beyond those stated in comments were verified; some implicit constraints (e.g., which DataTypes apply to which Sections) may exist but are undocumented.</li>
+            </ul>
+        </section>
+        
+        <!-- FOOTER -->
+        <footer class="report-footer">
+            <p><strong>NAPH 10th Annual Report — Open Data Specification Schema Analysis</strong></p>
+            <p>Generated on August 11, 2026 | Analysis based on specification schema only</p>
+            <p style="margin-top: 10px; font-size: 0.8em; color: #999;">
+                This report examines the structure and design of the NAPH 10AR Open Data specification.<br>
+                For clinical insights, the corresponding data files must be analysed separately.
+            </p>
+        </footer>
+        
+    </div>
+</body>
+</html>

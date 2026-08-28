@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAPH LAP 10th Annual Report - Analysis &amp; Findings</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #2C3E50;
+            --accent-blue: #2E86AB;
+            --accent-teal: #2A9D8F;
+            --accent-coral: #E76F51;
+            --accent-red: #E63946;
+            --bg-light: #F8F9FA;
+            --bg-white: #FFFFFF;
+            --text-dark: #2D3436;
+            --text-muted: #636E72;
+            --border-color: #DFE6E9;
+            --success-green: #D4EDDA;
+            --warning-yellow: #FFF3CD;
+            --danger-red: #FFEAA7;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-light);
+            color: var(--text-dark);
+            line-height: 1.7;
+        }
+        
+        /* Header */
+        .header-banner {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent-blue) 60%, var(--accent-teal) 100%);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .header-banner::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle at 30% 70%, rgba(255,255,255,0.08) 0%, transparent 60%);
+        }
+        .header-banner h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+        .header-banner p.subtitle {
+            font-size: 1.05rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+        .report-meta {
+            display: inline-flex;
+            gap: 1.5rem;
+            margin-top: 1rem;
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+        .report-meta span::before { content: '• '; opacity: 0.5; }
+        .report-meta span:first-child::before { content: ''; }
+        
+        /* Container */
+        .container {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        
+        /* Section styling */
+        section { margin-bottom: 2.5rem; }
+        
+        h2.section-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid var(--accent-blue);
+            display: inline-block;
+        }
+        
+        h3.subsection {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent-blue);
+            margin: 1.5rem 0 0.75rem;
+        }
+        
+        p {
+            margin-bottom: 0.75rem;
+            color: var(--text-dark);
+        }
+        
+        /* Cards */
+        .card {
+            background: var(--bg-white);
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid var(--accent-blue);
+        }
+        .card.danger { border-left-color: var(--accent-red); }
+        .card.warning { border-left-color: var(--accent-coral); }
+        .card.success { border-left-color: var(--accent-teal); }
+        
+        /* Key Metrics Row */
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.25rem;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            border-top: 4px solid var(--accent-blue);
+        }
+        .metric-card.highlight-red { border-top-color: var(--accent-red); }
+        .metric-card.highlight-teal { border-top-color: var(--accent-teal); }
+        .metric-card .metric-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--primary);
+            line-height: 1.1;
+        }
+        .metric-card .metric-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.3rem;
+            font-weight: 500;
+        }
+        
+        /* Tables */
+        table.styled-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            font-size: 0.9rem;
+        }
+        table.styled-table thead th {
+            background: var(--primary);
+            color: white;
+            padding: 0.85rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        table.styled-table tbody td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        table.styled-table tbody tr:last-child td { border-bottom: none; }
+        table.styled-table tbody tr:nth-child(even) { background: #FAFBFC; }
+        table.styled-table tbody tr:hover { background: #F1F3F5; }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.2em 0.6em;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-danger { background: #FFE0E0; color: #CC0000; }
+        .badge-warning { background: #FFF3CD; color: #856404; }
+        .badge-success { background: #D4EDDA; color: #155724; }
+        .badge-info { background: #D1ECF1; color: #0C5460; }
+        .badge-neutral { background: #E2E3E5; color: #383D41; }
+        
+        /* Charts */
+        .chart-wrapper {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+        .chart-wrapper img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+        .chart-caption {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 0.75rem;
+            font-style: italic;
+        }
+        
+        /* Two-column layout */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+        @media (max-width: 768px) {
+            .two-col { grid-template-columns: 1fr; }
+        }
+        
+        /* Insight boxes */
+        .insight-box {
+            background: linear-gradient(135deg, #EBF5FB, #E8F8F5);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+            border-left: 4px solid var(--accent-teal);
+        }
+        .insight-box.alert {
+            background: linear-gradient(135deg, #FFF5F5, #FEFCBF);
+            border-left-color: var(--accent-red);
+        }
+        .insight-box strong {
+            color: var(--primary);
+        }
+        
+        /* Timeline */
+        .timeline-item {
+            padding-left: 1.5rem;
+            border-left: 2px solid var(--border-color);
+            margin-bottom: 1.25rem;
+            position: relative;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -6px; top: 0.4rem;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+        }
+        .timeline-item .year {
+            font-weight: 700;
+            color: var(--accent-blue);
+            font-size: 0.85rem;
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border-color);
+            margin-top: 2rem;
+        }
+        
+        /* Action cards */
+        .action-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .action-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+        }
+        .action-card .centre-name {
+            font-weight: 700;
+            font-size: 0.95rem;
+            margin-bottom: 0.3rem;
+        }
+        .action-card .centre-sheffield { color: var(--accent-blue); }
+        .action-card .centre-rb { color: var(--accent-coral); }
+        .action-card .centre-newcastle { color: #264653; }
+        .action-card ul {
+            list-style: none;
+            padding: 0;
+        }
+        .action-card li {
+            padding: 0.2rem 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .action-card li::before { content: '→ '; color: var(--accent-teal); font-weight: bold; }
+        
+        /* Highlight numbers */
+        .num-highlight { font-weight: 700; color: var(--accent-red); }
+        .num-good { font-weight: 700; color: var(--accent-teal); }
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header-banner">
+    <h1>NAPH Local Action Plan — 10<sup>th</sup> Annual Report</h1>
+    <p class="subtitle">Analysis of Pulmonary HypertCentre Compliance Standards &amp; Improvement Actions</p>
+    <div class="report-meta">
+        <span>Report Date: August 10, 2026</span>
+        <span>Data Source: NAPH Audit 2018–19</span>
+        <span>Centres: Sheffield, Royal Brompton, Newcastle</span>
+    </div>
+</div>
+
+<div class="container">
+
+<!-- ============ SECTION: KEY METRICS ============ -->
+<section>
+    <h2 class="section-title">What Matters Most</h2>
+    
+    <div class="metrics-row">
+        <div class="metric-card highlight-red">
+            <div class="metric-value">79%</div>
+            <div class="metric-label">Sheffield Std 23 Performance (target: 80%)<br>&mdash; fell below standard for first time</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">−8</div>
+            <div class="metric-label">Percentage-point drop in Sheffield<br>(87% → 79% over 2 years)</div>
+        </div>
+        <div class="metric-card highlight-teal">
+            <div class="metric-value">3/3</div>
+            <div class="metric-label">Centres engaged with Standard 35<br>(pulmonary endarterectomy wait times)</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">5</div>
+            <div class="metric-label">Standards reviewed across all centres<br>(Stds 19, 23, 35)</div>
+        </div>
+    </div>
+    
+    <div class="insight-box alert">
+        <strong>⚠ Urgent Finding:</strong> Sheffield's performance on Standard 23 has dropped from meeting the target (87% in 2016-17, 86% in 2017-18) to <span class="num-highlight">falling below it at 79% in 2018-19</span>. This is the most significant performance decline identified across all centres.
+    </div>
+    
+    <div class="insight-box">
+        <strong>✅ Positive:</strong> All three centres are actively engaged in improvement planning. Dedicated staff appointments, pathway monitoring, and virtual MDT adoption represent concrete steps toward compliance. Standard 35 is recognised as a cross-cutting issue requiring collaboration with Royal Papworth Hospital, the national pulmonary endarterectomy centre.
+    </div>
+</section>
+
+<!-- ============ SECTION: DATA OVERVIEW ============ -->
+<section>
+    <h2 class="section-title">Data Overview</h2>
+    
+    <p>This report analyses the National Audit of Pulmonary Hypertension (NAPH) Local Action Plan (LAP) 10th Annual Report, covering three NHS specialist PH centres: <strong>Sheffield</strong>, <strong>Royal Brompton</strong>, and <strong>Newcastle (Freeman Hospital)</strong>.</p>
+    
+    <table class="styled-table">
+        <thead>
+            <tr>
+                <th>Centre</th>
+                <th>Standards Covered</th>
+                <th>Narrative Entries</th>
+                <th>Data Available?</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Sheffield</strong></td>
+                <td>Std 23, Std 35</td>
+                <td>2 detailed entries</td>
+                <td><span class="badge badge-success">Quantitative data</span></td>
+            </tr>
+            <tr>
+                <td><strong>Royal Brompton</strong></td>
+                <td>Std 35</td>
+                <td>1 detailed entry</td>
+                <td><span class="badge badge-info">Qualitative only</span></td>
+            </tr>
+            <tr>
+                <td><strong>Newcastle</strong></td>
+                <td>Std 19, Std 35</td>
+                <td>2 entries (one referenced)</td>
+                <td><span class="badge badge-info">Qualitative only</span></td>
+            </tr>
+        </tbody>
+    </table>
+    
+    <table class="styled-table">
+        <thead>
+            <tr>
+                <th>Standard ID</th>
+                <th>Description</th>
+                <th>Target Threshold</th>
+                <th>Centres Addressed</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Std 19</strong></td>
+                <td>Patients referred &gt;6 months ago should have a diagnosis recorded</td>
+                <td><strong>95%</strong></td>
+                <td>Newcastle</td>
+            </tr>
+            <tr>
+                <td><strong>Std 23</strong></td>
+                <td>PAH drug therapy within 12 weeks for new referrals (idiopathic, heritable, anorexigen-induced, or CTD-associated PAH in WHO FC II/III/IV)</td>
+                <td><strong>80%</strong></td>
+                <td>Sheffield</td>
+            </tr>
+            <tr>
+                <td><strong>Std 35</strong></td>
+                <td>Pulmonary endarterectomy within 4 months of CTEPH diagnosis</td>
+                <td><strong>90%</strong></td>
+                <td>Sheffield, Royal Brompton, Newcastle</td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ============ SECTION: SHEFFIELD PERFORMANCE TREND ============ -->
+<section>
+    <h2 class="section-title">Sheffield's Declining Performance on Standard 23</h2>
+    
+    <div class="card danger">
+        <h3>A measurable decline threatens patient care pathways</h3>
+        <p>Sheffield PH Centre's compliance with Standard 23 — ensuring that patients diagnosed with specific forms of PAH (idiopathic, heritable, anorexigen-induced, or connective tissue disease-associated) receive drug therapy within 12 weeks of their first referral — has shown a concerning downward trajectory.</p>
+        
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>Year</th>
+                    <th>Performance</th>
+                    <th>Standard Met?</th>
+                    <th>Trend vs Previous</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>2016-17</td>
+                    <td><strong>87%</strong></td>
+                    <td><span class="badge badge-success">✓ MET</span></td>
+                    <td>— (baseline)</td>
+                </tr>
+                <tr>
+                    <td>2017-18</td>
+                    <td><strong>86%</strong></td>
+                    <td><span class="badge badge-success">✓ MET</span></td>
+                    <td>▼ −1 pp</td>
+                </tr>
+                <tr style="background:#FFF5F5;">
+                    <td><strong>2018-19</strong></td>
+                    <td><strong style="color:#E63946;">79%</strong></td>
+                    <td><span class="badge badge-danger">✗ NOT MET</span></td>
+                    <td><span style="color:#E63946;font-weight:bold;">▼ −7 pp</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="chart-wrapper">
+        <img src="chart_sheffield_trend.png" alt="Sheffield Standard 23 performance trend showing decline from 87% to 79%">
+        <p class="chart-caption">Figure 1: Sheffield's Standard 23 compliance dropped below the 80% threshold in 2018-19 after two consecutive years of meeting the standard.</p>
+    </div>
+    
+    <p>The 8 percentage-point decline over the two-year period is substantial. The centre acknowledges this regression in its planned actions, identifying the need for <strong>dedicated tracking staff</strong> and the appointment of an <strong>additional medical consultant in October 2019</strong> to restore service capacity. These measures appear well-targeted to address the root causes of delay in the patient pathway.</p>
+    
+    <p>It is notable that Sheffield was the <em>only centre among the three audited</em> reporting quantitative historical data for any standard. Royal Brompton and Newcastle provided qualitative descriptions without numerical benchmarks, limiting our ability to assess temporal trends at those sites.</p>
+</section>
+
+<!-- ============ SECTION: STANDARD 35 CROSS-CUTTING ISSUE ============ -->
+<section>
+    <h2 class="section-title">Standard 35: A Shared Challenge Across All Centres</h2>
+    
+    <p>Perhaps the most striking pattern in this dataset is the universal engagement with <strong>Standard 35</strong> — that 90% of patients undergoing pulmonary endarterectomy should wait less than four months from their diagnosis of chronic thromboembolic pulmonary hypertension (CTEPH). All three centres reference this standard, and all three acknowledge that addressing it requires coordination with <strong>Royal Papworth Hospital</strong>, the national pulmonary endarterectomy centre.</p>
+    
+    <div class="chart-wrapper">
+        <img src="chart_standards_comparison.png" alt="Standards compliance comparison showing all centres engaged with Standard 35">
+        <p class="chart-caption">Figure 2: Each centre faces distinct priority standards, but Standard 35 creates a collaborative requirement across all three PH centres.</p>
+    </div>
+    
+    <div class="two-col">
+        <div>
+            <h3 class="subsection">Sheffield's Approach</h3>
+            <div class="card success">
+                <p>Sheffield has taken the most proactive local measures: appointing <strong>an additional secretary</strong> to reduce administrative delays, assigning <strong>dedicated nursing staff</strong> to monitor the patient pathway, and specifically reviewing coronary angiography waiting times for accepted surgical patients. They are also collaborating directly with Royal Papworth.</p>
+            </div>
+        </div>
+        <div>
+            <h3 class="subsection">Royal Brompton &amp; Newcastle</h3>
+            <div class="card warning">
+                <p>Both centres explicitly defer to Royal Papworth's national response. Royal Brompton supplements this with local pathway tracking and regular audits, while expressing interest in a <strong>virtual MDT model</strong> to accelerate surgical suitability decisions. Newcastle provides no actionable detail beyond the reference.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="insight-box">
+        <strong>Insight:</strong> Standard 35 reveals a systemic bottleneck in the CTEPH surgical pathway. While individual PH centres can optimise their own processes, the ultimate determinant of wait times lies at the single national referral centre (Royal Papworth). This suggests the audit's recommendations would benefit from being escalated to a system-wide review of referral volume, surgical capacity planning, and triage protocols at Royal Papworth.
+    </div>
+</section>
+
+<!-- ============ SECTION: STANDARDS LANDSCAPE VISUALIZATION ============ -->
+<section>
+    <h2 class="section-title">Standards Landscape Across Centres</h2>
+    
+    <div class="chart-wrapper">
+        <img src="chart_standards_overview.png" alt="Standards overview bar chart by centre">
+        <p class="chart-caption">Figure 3: Mapping which standards each centre addresses in their LAP submission. Colours indicate whether quantitative performance data is available.</p>
+    </div>
+    
+    <div class="chart-wrapper">
+        <img src="chart_summary_table.png" alt="Summary table of standards across centres">
+        <p class="chart-caption">Figure 4: Consolidated summary table showing targets, current performance status, and compliance levels for each standard-centre combination.</p>
+    </div>
+</section>
+
+<!-- ============ SECTION: IMPROVEMENT ACTIONS ============ -->
+<section>
+    <h2 class="section-title">Planned Improvement Actions by Centre</h2>
+    
+    <p>The planned actions reveal distinct strategic approaches at each centre. Rather than generic commitments, several centres describe specific staffing investments and structural changes.</p>
+    
+    <div class="chart-wrapper">
+        <img src="chart_action_plans.png" alt="Action plans breakdown by centre">
+        <p class="chart-caption">Figure 5: Distribution of planned improvement actions across the three PH centres.</p>
+    </div>
+    
+    <div class="action-grid">
+        <div class="action-card">
+            <div class="centre-name centre-sheffield">🏥 Sheffield</div>
+            <ul>
+                <li>Additional medical consultant (Oct 2019)</li>
+                <li>Dedicated staff member for patient tracking</li>
+                <li>Service capacity review underway</li>
+                <li>Additional secretary for admin support</li>
+                <li>Review of coronary angiography waiting times</li>
+            </ul>
+        </div>
+        <div class="action-card">
+            <div class="centre-name centre-rb">🏥 Royal Brompton</div>
+            <ul>
+                <li>Continued local pathway tracking</li>
+                <li>Regular audits of non-compliant patients</li>
+                <li>Planning virtual MDT with Royal Papworth</li>
+            </ul>
+        </div>
+        <div class="action-card">
+            <div class="centre-name centre-newcastle">🏥 Newcastle (Freeman Hospital)</div>
+            <ul>
+                <li>All new patient activity monitored</li>
+                <li>Diagnosis recording within recognised timeframe</li>
+                <li>Database accuracy improvements</li>
+            </ul>
+        </div>
+    </div>
+    
+    <h3 class="subsection">Classification of Actions</h3>
+    <table class="styled-table">
+        <thead>
+            <tr>
+                <th>Action Category</th>
+                <th>Sheffield</th>
+                <th>Royal Brompton</th>
+                <th>Newcastle</th>
+                <th>Potential Impact</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Staff recruitment/training</td>
+                <td><span class="badge badge-success">Yes</span></td>
+                <td><span class="badge badge-neutral">No</span></td>
+                <td><span class="badge badge-neutral">No</span></td>
+                <td>High — directly addresses capacity gaps</td>
+            </tr>
+            <tr>
+                <td>Pathway monitoring</td>
+                <td><span class="badge badge-success">Yes</span></td>
+                <td><span class="badge badge-success">Yes</span></td>
+                <td><span class="badge badge-success">Yes</span></td>
+                <td>Medium — ensures accountability</td>
+            </tr>
+            <tr>
+                <td>Digital/virtual solutions</td>
+                <td><span class="badge badge-neutral">No</span></td>
+                <td><span class="badge badge-warning">Planned</span></td>
+                <td><span class="badge badge-neutral">No</span></td>
+                <td>High — may reduce geographic bottlenecks</td>
+            </tr>
+            <tr>
+                <td>Data quality improvement</td>
+                <td><span class="badge badge-neutral">No</span></td>
+                <td><span class="badge badge-neutral">No</span></td>
+                <td><span class="badge badge-success">Yes</span></td>
+                <td>Medium — enables better measurement</td>
+            </tr>
+            <tr>
+                <td>Surgical pathway review</td>
+                <td><span class="badge badge-success">Yes</span></td>
+                <td><span class="badge badge-warning">Planned</span></td>
+                <td><span class="badge badge-neutral">Referenced</span></td>
+                <td>Very high — direct impact on Std 35</td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- ============ SECTION: EXECUTIVE DASHBOARD ============ -->
+<section>
+    <h2 class="section-title">Executive Dashboard</h2>
+    
+    <div class="chart-wrapper">
+        <img src="chart_executive_dashboard.png" alt="Executive dashboard summarising key metrics and trends">
+        <p class="chart-caption">Figure 6: Executive dashboard consolidating the most critical data points from the NAPH LAP audit.</p>
+    </div>
+</section>
+
+<!-- ============ SECTION: PATIENT PATHWAY TIMELINE ============ -->
+<section>
+    <h2 class="section-title">Patient Pathways Identified</h2>
+    
+    <p>The action plans collectively identify three distinct patient pathway segments where delays occur:</p>
+    
+    <div class="two-col">
+        <div class="card">
+            <h3 class="subsection">Referral → Diagnosis (Std 19)</h3>
+            <p>Patients whose referral letters arrived over six months ago must have a diagnosis recorded. Newcastle's Freeman Hospital monitors all new patient activity to ensure timely documentation.</p>
+        </div>
+        <div class="card">
+            <h3 class="subsection">Referral → Drug Therapy (Std 23)</h3>
+            <p>PAH drug therapy must commence within 12 weeks. Sheffield's declining performance indicates bottlenecks between referral receipt and treatment initiation, likely in assessment or capacity-constrained consultation scheduling.</p>
+        </div>
+        <div class="card" style="grid-column: 1 / -1;">
+            <h3 class="subsection">Diagnosis → Surgery (Std 35)</h3>
+            <p>The most complex pathway, spanning from CTEPH diagnosis through pulmonary endarterectomy at Royal Papworth Hospital. This involves multiple handoffs: local PH centre assessment → national surgical referral → MDT decision → surgery scheduling → pre-operative investigations (e.g., coronary angiography).</p>
+        </div>
+    </div>
+</section>
+
+<!-- ============ SECTION: RECOMMENDATIONS ============ -->
+<section>
+    <h2 class="section-title">Recommendations</h2>
+    
+    <div class="card">
+        <h3 class="subsection">1. Escalate Standard 35 to System-Wide Review</h3>
+        <p>All three centres point to Royal Papworth Hospital as the critical node in the pulmonary endarterectomy pathway. The NAPH audit team should commission a separate review of Royal Papworth's CTEPH surgical capacity and referral processing times. Virtual MDT proposals from Royal Brompton should be fast-tracked.</p>
+    </div>
+    
+    <div class="card warning">
+        <h3 class="subsection">2. Prioritise Sheffield Standard 23 Recovery</h3>
+        <p>Sheffield's 8-percentage-point decline is the clearest quantified deterioration signal. The planned consultant appointment and dedicated tracking staff are appropriate responses. However, these actions were set for implementation in 2020, meaning the next annual report will show whether recovery has begun. An interim checkpoint at 6 months would be advisable.</p>
+    </div>
+    
+    <div class="card success">
+        <h3 class="subsection">3. Standardise Quantitative Reporting Across Centres</h3>
+        <p>Only Sheffield provides historical quantitative performance data. Royal Brompton and Newcastle should be encouraged to submit baseline and current-measure figures alongside their narrative action plans. This enables the NAPH programme to track improvement trajectories nationally and identify centres needing external intervention.</p>
+    </div>
+    
+    <div class="card">
+        <h3 class="subsection">4. Publish Cross-Centre Comparative Benchmarks</h3>
+        <p>With sufficient data, the NAPH programme could publish anonymised comparative benchmarks for each standard. Knowing that one centre achieves 92% on drug therapy initiation while another sits at 79% creates productive peer pressure and enables sharing of best practices.</p>
+    </div>
+</section>
+
+<!-- ============ SECTION: METHODOLOGY ============ -->
+<section>
+    <h2 class="section-title">Methods &amp; Limitations</h2>
+    
+    <p><strong>Data source:</strong> Three markdown-formatted Local Action Plan documents from the NAPH 10th Annual Report cycle, covering Sheffield, Royal Brompton, and Newcastle PH centres.</p>
+    
+    <p><strong>Approach:</strong> Textual data was extracted from structured tables within each document, capturing Standard ID, descriptive text, recommendation text, and planned actions. Quantitative performance figures (available only for Sheffield/Standard 23) were parsed from the narrative text using pattern matching.</p>
+    
+    <p><strong>Limited scope of quantitative analysis:</strong> Only Sheffield reported time-series performance data (three years), enabling trend analysis. Royal Brompton and Newcastle provided only qualitative descriptions. Consequently, the statistical analysis is necessarily skewed toward Sheffield's experience.</p>
+    
+    <p><strong>Cross-referencing limitation:</strong> Multiple centres reference "see Royal Papworth response" for Standard 35, indicating a centralised reporting structure. Without access to Royal Papworth's own LAP submission, assessments of compliance against Standard 35 remain incomplete.</p>
+    
+    <p><strong>Visualization approach:</strong> Charts were created using Python's matplotlib library. Where exact numerical values were not provided (Stds 19, 35), illustrative relative scores were used in comparative visualisations to convey qualitative assessment of each centre's engagement level.</p>
+</section>
+
+</div><!-- /container -->
+
+<!-- FOOTER -->
+<div class="footer">
+    <p>NAPH Local Action Plan 10th Annual Report — Analysis Report Generated on August 10, 2026</p>
+    <p>Prepared by LAMBDA Data Analysis Agent | Data source: NHS Digital National Audit of Pulmonary Hypertension</p>
+</div>
+
+</body>
+</html>

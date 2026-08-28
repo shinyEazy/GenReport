@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAPH LAP 10th Annual Report Analysis</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
+            line-height: 1.7;
+        }
+        
+        .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+        
+        /* Header */
+        .report-header {
+            background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%);
+            color: white;
+            padding: 3rem 2.5rem;
+            border-radius: 16px;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(26, 35, 126, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        .report-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+        .report-header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; position: relative; }
+        .report-header .subtitle { font-size: 1.1rem; opacity: 0.9; font-weight: 300; position: relative; }
+        .report-header .date { font-size: 0.85rem; opacity: 0.7; margin-top: 1rem; position: relative; }
+        
+        /* Summary cards */
+        .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .summary-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            border-left: 4px solid;
+        }
+        .summary-card.orange { border-left-color: #ff8c00; }
+        .summary-card.blue { border-left-color: #4169e1; }
+        .summary-card.green { border-left-color: #4caf50; }
+        .summary-card.purple { border-left-color: #7c4dff; }
+        .summary-card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: #888; font-weight: 600; }
+        .summary-card .value { font-size: 1.6rem; font-weight: 700; margin-top: 0.3rem; }
+        .summary-card .desc { font-size: 0.82rem; color: #666; margin-top: 0.3rem; }
+        
+        /* Section styles */
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .section h2 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #1a237e;
+            margin-bottom: 1rem;
+            padding-bottom: 0.6rem;
+            border-bottom: 2px solid #e8eaf6;
+        }
+        .section h3 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #333;
+            margin: 1.2rem 0 0.5rem 0;
+        }
+        .section p { margin-bottom: 0.8rem; color: #444; font-size: 0.95rem; }
+        
+        /* Table styles */
+        table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        th {
+            background: #e8eaf6;
+            color: #1a237e;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #eee;
+            font-size: 0.88rem;
+            vertical-align: top;
+        }
+        tr:hover td { background: #fafafa; }
+        .page-badge {
+            display: inline-block;
+            background: #e8eaf6;
+            color: #3949ab;
+            padding: 0.15rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        /* Status badges */
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.7rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-progress { background: #fff3e0; color: #e65100; }
+        .badge-review { background: #e3f2fd; color: #0d47a1; }
+        
+        /* Insight boxes */
+        .insight {
+            background: #f8f9fa;
+            border-left: 4px solid #3949ab;
+            padding: 1rem 1.2rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .insight.warning { border-left-color: #ff8c00; background: #fffdf5; }
+        .insight.success { border-left-color: #4caf50; background: #f1f8f4; }
+        .insight-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.3rem; }
+        
+        /* Chart container */
+        .chart-container {
+            text-align: center;
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background: #fafbfc;
+            border-radius: 12px;
+        }
+        .chart-container img { max-width: 100%; height: auto; border-radius: 8px; }
+        
+        /* Key takeaway */
+        .key-point {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.8rem;
+            padding: 0.8rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .key-point:last-child { border-bottom: none; }
+        .key-num {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            background: #e8eaf6;
+            color: #1a237e;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+        .key-text { font-size: 0.92rem; color: #444; padding-top: 2px; }
+        .key-text strong { color: #1a1a2e; }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: #999;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- Header -->
+    <div class="report-header">
+        <h1>National Audit of Pulmonary Hypertension</h1>
+        <div class="subtitle">Local Action Plan — 10th Annual Report Analysis</div>
+        <div class="date">Report Date: August 10, 2026</div>
+    </div>
+
+    <!-- Executive Summary Cards -->
+    <div class="summary-cards">
+        <div class="summary-card orange">
+            <div class="label">Quality Standards Tracked</div>
+            <div class="value">2</div>
+            <div class="desc">Both standards not yet fully met</div>
+        </div>
+        <div class="summary-card blue">
+            <div class="label">Target Rates</div>
+            <div class="value">80% / 90%</div>
+            <div class="desc">Drug therapy &amp; surgery wait times</div>
+        </div>
+        <div class="summary-card green">
+            <div class="label">Action Taken</div>
+            <div class="value">Active</div>
+            <div class="desc">Increasing catheterisation throughput</div>
+        </div>
+        <div class="summary-card purple">
+            <div class="label">Outstanding</div>
+            <div class="value">Review</div>
+            <div class="desc">Royal Papworth response pending</div>
+        </div>
+    </div>
+
+    <!-- What Matters Most -->
+    <div class="section">
+        <h2>What Matters Most</h2>
+        
+        <div class="key-point">
+            <div class="key-num">1</div>
+            <div class="key-text"><strong>PAH drug therapy initiation is behind target.</strong> The standard requires 80% of eligible patients to commence therapy within 12 weeks of referral. Current pathway delays suggest this threshold has not yet been met — action is being taken to increase diagnostic right heart catheterisation throughput ahead of the 11th Annual Report.</div>
+        </div>
+        
+        <div class="key-point">
+            <div class="key-num">2</div>
+            <div class="key-text"><strong>Pulmonary endarterectomy wait times are a cross-institutional challenge.</strong> The 90% standard (wait less than four months from CTEPH diagnosis) requires coordinated effort between NHS England and PH centres because the patient pathway is inherently complex. The Royal Papworth Hospital response is awaited for specific improvement measures.</div>
+        </div>
+        
+        <div class="key-point">
+            <div class="key-num">3</div>
+            <div class="key-text"><strong>Both standards represent critical care quality benchmarks.</strong> They cover two fundamentally different treatment pathways — medical management (drug therapy) and surgical intervention (pulmonary endarterectomy) — reflecting the NAPH audit's comprehensive approach to pulmonary hypertension care quality.</div>
+        </div>
+        
+        <div class="key-point">
+            <div class="key-num">4</div>
+            <div class="key-text"><strong>The report signals optimism for the drug therapy standard specifically.</strong> The centre explicitly states it is "hopeful to meet this standard in the 11th Annual Report," suggesting that ongoing improvements in catheterisation throughput are on track.</div>
+        </div>
+    </div>
+
+    <!-- Detailed Standard Breakdown -->
+    <div class="section">
+        <h2>Quality Standards Detail</h2>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:60px;">Page</th>
+                    <th style="width:140px;">Standard</th>
+                    <th>Recommendation</th>
+                    <th>Planned Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="page-badge">Pg 28</span></td>
+                    <td><strong>PAH Drug Therapy Initiation</strong></td>
+                    <td>Centres should review delays in their patient pathway if they do not meet the 80% standard.</td>
+                    <td>Increasing diagnostic right heart catheterisation throughput; hopeful to meet standard in the 11th Annual Report.</td>
+                </tr>
+                <tr>
+                    <td><span class="page-badge">Pg 35</span></td>
+                    <td><strong>Pulmonary Endarterectomy Wait Time</strong></td>
+                    <td>NHS England and PH centres need joint effort since the patient pathway is complex.</td>
+                    <td>See Royal Papworth response — awaiting detailed plan.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Visualisation -->
+    <div class="section">
+        <h2>Standards at a Glance</h2>
+        <p>A visual overview of the two quality standards tracked in this Local Action Plan, including their page references and current progress status.</p>
+        <div class="chart-container">
+            <img src="/api/v1/files/content?url=/workspace/GenReport/backend/data/workspaces/41/dashboard.png" alt="Dashboard showing NAPH LAP quality standards">
+        </div>
+    </div>
+
+    <!-- In-depth Findings -->
+    <div class="section">
+        <h2>In-Depth Findings</h2>
+        
+        <h3>Standard 1: PAH Drug Therapy Initiation (Page 28)</h3>
+        <p>This standard addresses the critical time-to-treatment metric for patients diagnosed with pulmonary arterial hypertension (PAH). It covers a broad patient population including those with idiopathic, heritable, anorexigen-induced, or connective tissue disease-associated forms of the condition who present at WHO functional class II, III, or IV.</p>
+        
+        <div class="insight warning">
+            <div class="insight-title">⚠️ Bottleneck Identified</div>
+            Delays in the patient pathway are preventing timely drug therapy initiation. The primary lever identified is increasing throughput for diagnostic right heart catheterisation — the gold-standard procedure needed before PAH-specific drugs can be prescribed.
+        </div>
+        
+        <p>The planned action demonstrates a focused, operational approach rather than vague commitments. Increasing catheterisation capacity directly addresses what is likely a resource bottleneck in the diagnostic pathway. The explicit statement of hopefulness about meeting the standard in the next annual report suggests measurable progress is already underway.</p>
+        
+        <h3>Standard 2: Pulmonary Endarterectomy Wait Time (Page 35)</h3>
+        <p>This standard governs the maximum acceptable waiting period for one of the most complex cardiovascular surgeries available — pulmonary endarterectomy for chronic thromboembolic pulmonary hypertension (CTEPH). The 90%/4-month threshold ensures patients receive potentially curative surgical treatment without harmful delay.</p>
+        
+        <div class="insight">
+            <div class="insight-title">📌 Cross-Institutional Complexity</div>
+            Unlike Standard 1 which is primarily a centre-level issue, Standard 2 explicitly identifies the need for joint coordination between NHS England (the commissioner/funder) and PH centres (the providers). This reflects systemic challenges in surgical commissioning, operating theatre availability, and multidisciplinary governance.
+        </div>
+        
+        <p>The fact that only "See Royal Papworth response" is listed as planned action — compared to the more detailed commitment for Standard 1 — suggests that the improvement plan for endarterectomy wait times may still be under development. Royal Papworth Hospital, as the UK's specialist cardiothoracic centre, plays a central role in CTEPH surgical care.</p>
+    </div>
+
+    <!-- Patient Journey Comparison -->
+    <div class="section">
+        <h2>Care Pathway Comparison</h2>
+        <p>The two standards address distinct treatment pathways in pulmonary hypertension management:</p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>Standard 1 — Medical Management</th>
+                    <th>Standard 2 — Surgical Intervention</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Condition</strong></td>
+                    <td>PAH (idiopathic, heritable, drug-induced, CT-disease associated)</td>
+                    <td>CTEPH (Chronic Thromboembolic Pulmonary Hypertension)</td>
+                </tr>
+                <tr>
+                    <td><strong>Treatment</strong></td>
+                    <td>PAH-specific drug therapy</td>
+                    <td>Pulmonary endarterectomy surgery</td>
+                </tr>
+                <tr>
+                    <td><strong>Time Target</strong></td>
+                    <td>Within 12 weeks of first referral</td>
+                    <td>Less than 4 months from diagnosis</td>
+                </tr>
+                <tr>
+                    <td><strong>Target Rate</strong></td>
+                    <td>80%</td>
+                    <td>90%</td>
+                </tr>
+                <tr>
+                    <td><strong>Primary Barrier</strong></td>
+                    <td>Diagnostics bottleneck (right heart catheterisation)</td>
+                    <td>Complex multi-stakeholder coordination</td>
+                </tr>
+                <tr>
+                    <td><strong>Response Level</strong></td>
+                    <td>Centre-level action planned</td>
+                    <td>NHS England + centre coordination needed</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="section">
+        <h2>Recommended Next Steps</h2>
+        
+        <div class="key-point">
+            <div class="key-num">1</div>
+            <div class="key-text"><strong>Monitor catheterisation throughput metrics closely.</strong> Track the number of right heart catheterisations performed per month against baseline to quantify whether capacity expansion is progressing as projected ahead of the 11th Annual Report.</div>
+        </div>
+        
+        <div class="key-point">
+            <div class="key-num">2</div>
+            <div class="key-text"><strong>Obtain and evaluate the Royal Papworth response.</strong> A detailed improvement plan for pulmonary endarterectomy wait times is essential. Once received, assess whether it includes specific measures such as dedicated surgical lists, accelerated pre-operative assessment pathways, or enhanced inter-centre referral protocols.</div>
+        </div>
+        
+        <div class="key-point">
+            <div class="key-num">3</div>
+            <div class="key-text"><strong>Consider linking to patient outcome data.</strong> While these standards measure access and timeliness, incorporating clinical outcomes (functional improvement, survival rates) would provide a more complete picture of care quality across both pathways.</div>
+        </div>
+        
+        <div class="key-point">
+            <div class="key-num">4</div>
+            <div class="key-text"><strong>Evaluate whether additional standards are needed.</strong> This Local Action Plan excerpt covers two standards out of the full NAPH audit. Review whether other audited standards relevant to this centre have corresponding action plans documented elsewhere.</div>
+        </div>
+    </div>
+
+    <!-- Methods & Limitations -->
+    <div class="section">
+        <h2>Methods &amp; Limitations</h2>
+        <p>This analysis is based solely on the provided extract from the NAPH LAP 10th Annual Report, which contains two quality standards with their associated recommendations and planned actions. No numerical performance data (actual percentages achieved) was included in the source material, so the analysis cannot quantify how far each standard is from being met. The dashboard visualises the standards' structure and current status classifications inferred from the written responses. For a fuller assessment, complete report pages, historical trend data, and additional standards should be incorporated.</p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        Generated by LAMBDA Analytics &nbsp;·&nbsp; August 10, 2026<br>
+        Data source: National Audit of Pulmonary Hypertension Local Action Plan — 10th Annual Report
+    </div>
+
+</div>
+</body>
+</html>
