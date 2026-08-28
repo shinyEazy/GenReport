@@ -11,10 +11,6 @@ services:
       - "8011:8011"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    # Keep provider settings in the src configuration file, not the shell
-    # that happens to run Docker Compose.
-    env_file:
-      - ../src/.env
     environment:
       UV_SYSTEM_PYTHON: "1"
       UV_LINK_MODE: copy
