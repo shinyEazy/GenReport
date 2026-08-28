@@ -38,10 +38,7 @@ def trace_operation(
 
 
 def _tracing_enabled() -> bool:
-    return any(
-        os.getenv(name, "").strip().lower() == "true"
-        for name in ("LANGSMITH_TRACING", "LANGCHAIN_TRACING_V2")
-    )
+    return os.getenv("LANGCHAIN_TRACING_V2", "").strip().lower() == "true"
 
 
 def _normalize_mapping(value: Mapping[str, Any]) -> dict[str, Any]:

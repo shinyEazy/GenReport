@@ -47,13 +47,9 @@ class Settings(BaseSettings):
     )
     REPORT_DASHBOARD_MAX_PAGE_IMAGES: int = Field(default=8, ge=0, le=16)
 
-    LANGSMITH_TRACING: bool = False
     LANGCHAIN_TRACING_V2: bool = False
-    LANGSMITH_API_KEY: str = ""
     LANGCHAIN_API_KEY: str = ""
-    LANGSMITH_PROJECT: str = ""
     LANGCHAIN_PROJECT: str = ""
-    LANGSMITH_ENDPOINT: str = ""
     LANGCHAIN_ENDPOINT: str = ""
 
     MAX_AGENT_ITERATIONS: int = Field(default=100, ge=1, le=100)
@@ -73,26 +69,11 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def normalize_langsmith_settings(self):
-        tracing = self.LANGSMITH_TRACING or self.LANGCHAIN_TRACING_V2
-        self.LANGSMITH_TRACING = tracing
-        self.LANGCHAIN_TRACING_V2 = tracing
-
-        api_key = self.LANGSMITH_API_KEY or self.LANGCHAIN_API_KEY
-        self.LANGSMITH_API_KEY = api_key
-        self.LANGCHAIN_API_KEY = api_key
-
-        project = self.LANGSMITH_PROJECT or self.LANGCHAIN_PROJECT or "gen-report"
-        self.LANGSMITH_PROJECT = project
-        self.LANGCHAIN_PROJECT = project
-
-        endpoint = (
-            self.LANGSMITH_ENDPOINT
-            or self.LANGCHAIN_ENDPOINT
-            or "https://api.smith.langchain.com"
+    def normalize_langchain_settings(self):
+        self.LANGCHAIN_PROJECT = self.LANGCHAIN_PROJECT or "gen-report"
+        self.LANGCHAIN_ENDPOINT = (
+            self.LANGCHAIN_ENDPOINT or "https://api.smith.langchain.com"
         )
-        self.LANGSMITH_ENDPOINT = endpoint
-        self.LANGCHAIN_ENDPOINT = endpoint
         return self
 
     @property
@@ -116,16 +97,12 @@ class Settings(BaseSettings):
 
 
 def configure_langsmith_environment(value: Settings) -> None:
-    tracing = "true" if value.LANGSMITH_TRACING else "false"
-    os.environ["LANGSMITH_TRACING"] = tracing
+    tracing = "true" if value.LANGCHAIN_TRACING_V2 else "false"
     os.environ["LANGCHAIN_TRACING_V2"] = tracing
-    os.environ["LANGSMITH_PROJECT"] = value.LANGSMITH_PROJECT
-    os.environ["LANGCHAIN_PROJECT"] = value.LANGSMITH_PROJECT
-    os.environ["LANGSMITH_ENDPOINT"] = value.LANGSMITH_ENDPOINT
-    os.environ["LANGCHAIN_ENDPOINT"] = value.LANGSMITH_ENDPOINT
-    if value.LANGSMITH_API_KEY:
-        os.environ["LANGSMITH_API_KEY"] = value.LANGSMITH_API_KEY
-        os.environ["LANGCHAIN_API_KEY"] = value.LANGSMITH_API_KEY
+    os.environ["LANGCHAIN_PROJECT"] = value.LANGCHAIN_PROJECT
+    os.environ["LANGCHAIN_ENDPOINT"] = value.LANGCHAIN_ENDPOINT
+    if value.LANGCHAIN_API_KEY:
+        os.environ["LANGCHAIN_API_KEY"] = value.LANGCHAIN_API_KEY
 
 
 settings = Settings()
