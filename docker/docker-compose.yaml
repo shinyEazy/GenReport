@@ -7,6 +7,9 @@ services:
     volumes:
       - ../:/workspace/GenReport
       - uv-cache:/root/.cache/uv
+    env_file:
+      - path: .env
+        required: true
     ports:
       - "8011:8011"
     extra_hosts:
