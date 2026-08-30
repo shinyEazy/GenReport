@@ -86,13 +86,12 @@ To trace both the streaming API workflow and local CLI runs, configure the
 LangSmith credentials and enable tracing:
 
 ```bash
-LANGSMITH_TRACING=true
-LANGSMITH_API_KEY=your-langsmith-api-key
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=your-langsmith-api-key
 LANGCHAIN_PROJECT=gen-report
 ```
 
-`LANGCHAIN_TRACING_V2=true` is also supported for existing deployments. Remote
-runs use a `genreport-report-workflow` root; CLI runs use
+Remote runs use a `genreport-report-workflow` root; CLI runs use
 `genreport-local-report-workflow`. Each has nested traces for discovery, input
 or workspace preparation, asset materialization, prompt construction, every LLM
 round, tool call, and artifact finalization. The traces intentionally preserve

@@ -3,18 +3,17 @@ name: gen-report
 services:
   api:
     image: ghcr.io/astral-sh/uv:python3.11-bookworm-slim
-    working_dir: /workspace/GenReport/backend
+    working_dir: /workspace/GenReport/src
     volumes:
       - ../:/workspace/GenReport
       - uv-cache:/root/.cache/uv
+    env_file:
+      - path: .env
+        required: true
     ports:
       - "8011:8011"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    # Keep provider settings in the backend configuration file, not the shell
-    # that happens to run Docker Compose.
-    env_file:
-      - ../backend/.env
     environment:
       UV_SYSTEM_PYTHON: "1"
       UV_LINK_MODE: copy
