@@ -87,6 +87,47 @@ class RuntimeGatewayCapability(BaseModel):
     capabilities: list[str] = Field(default_factory=list)
 
 
+class SelectedFileReferenceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    resource_id: str = Field(min_length=1, max_length=255)
+    filename: str = Field(min_length=1, max_length=512)
+    object_key: str = Field(min_length=1, max_length=2048)
+    bucket: str = Field(min_length=1, max_length=255)
+    content_type: str | None = Field(default=None, max_length=255)
+
+
+class SelectedFilesRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["all", "selected"] = "all"
+    resource_ids: list[str] = Field(default_factory=list, max_length=100)
+    resource_names: list[str] = Field(default_factory=list, max_length=100)
+    resource_refs: list[SelectedFileReferenceRequest] = Field(
+        default_factory=list,
+        max_length=100,
+    )
+
+    @model_validator(mode="after")
+    def validate_selected_resources(self):
+        if any(not resource_id.strip() for resource_id in self.resource_ids):
+            raise ValueError("selected_files.resource_ids must not contain blank values")
+        if self.mode == "selected" and not self.resource_ids:
+            raise ValueError(
+                "selected_files.selected requires at least one resource_id"
+            )
+        if len(set(self.resource_ids)) != len(self.resource_ids):
+            raise ValueError("selected_files.resource_ids must be unique")
+        reference_ids = [reference.resource_id for reference in self.resource_refs]
+        if len(set(reference_ids)) != len(reference_ids):
+            raise ValueError("selected_files.resource_refs must be unique")
+        if any(resource_id not in self.resource_ids for resource_id in reference_ids):
+            raise ValueError(
+                "selected_files.resource_refs must belong to resource_ids"
+            )
+        return self
+
+
 class ReportExecutionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -107,6 +148,7 @@ class ReportExecutionRequest(BaseModel):
     )
     runtime_gateway: RuntimeGatewayCapability
     discover_workspace_files: bool = False
+    selected_files: SelectedFilesRequest | None = None
     workspace_discovery_instruction: str | None = Field(
         default=None,
         max_length=20_000,

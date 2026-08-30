@@ -642,6 +642,7 @@ class ReportExecutionService:
             runtime_gateway=request.runtime_gateway.model_dump(mode="json"),
             model=request.model,
             primary_source_id=request.primary_source_id,
+            selected_files=request.selected_files,
         )
 
     async def _stream_llm_round_impl(

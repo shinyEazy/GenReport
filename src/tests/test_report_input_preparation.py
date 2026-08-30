@@ -2,7 +2,7 @@ import logging
 import unittest
 from unittest.mock import AsyncMock
 
-from app.contracts.report_execution import ExecutionFileRequest
+from app.contracts.report_execution import SelectedFilesRequest, ExecutionFileRequest
 from app.services.report_input_preparation import (
     ReportInputPreparationError,
     ReportInputPreparationService,
@@ -34,6 +34,47 @@ def metadata_result(
 
 
 class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_selected_files_stage_requested_documents_without_discovery(self) -> None:
+        discovery = AsyncMock()
+        method_hub = AsyncMock()
+        method_hub.call_tool.return_value = metadata_result(
+            "doc-selected",
+            filename="selected.pdf",
+        )
+        runtime_gateway = AsyncMock()
+        runtime_gateway.stage_report_inputs.return_value = [
+            {
+                "artifact_id": "asset-selected",
+                "filename": "selected.pdf",
+                "sandbox_path": "/workspace/runs/resp-1/inputs/selected.pdf",
+                "content_type": "application/pdf",
+                "size": 123,
+            }
+        ]
+        service = ReportInputPreparationService(
+            discovery_agent=discovery,
+            method_hub=method_hub,
+            runtime_gateway_client=runtime_gateway,
+        )
+
+        prepared = await service.prepare(
+            query="Create a report",
+            existing_files=[],
+            discover_workspace_files=True,
+            organization_id="test-org",
+            workspace_id="workspace-b",
+            runtime_gateway={"endpoint": "http://runtime", "token": "secret"},
+            model="test-model",
+            selected_files=SelectedFilesRequest(
+                mode="selected",
+                resource_ids=["doc-selected"],
+                resource_names=["selected.pdf"],
+            ),
+        )
+
+        discovery.discover.assert_not_awaited()
+        self.assertEqual([item.document_id for item in prepared.files], ["doc-selected"])
+
     async def test_logs_when_workspace_discovery_is_disabled(self) -> None:
         discovery = AsyncMock()
         service = ReportInputPreparationService(

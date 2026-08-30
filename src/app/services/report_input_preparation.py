@@ -5,7 +5,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from app.contracts.report_execution import ExecutionFileRequest, SelectedReportInput
+from app.contracts.report_execution import (
+    ExecutionFileRequest,
+    SelectedFilesRequest,
+    SelectedReportInput,
+)
 
 if TYPE_CHECKING:
     from app.services.method_hub_client import MethodHubClient
@@ -68,9 +72,15 @@ class ReportInputPreparationService:
         runtime_gateway: dict[str, Any] | None,
         model: str | None,
         primary_source_id: str | None = None,
+        selected_files: SelectedFilesRequest | None = None,
     ) -> PreparedReportInputs:
         files = list(existing_files)
-        if not discover_workspace_files:
+        selected_document_ids = (
+            list(selected_files.resource_ids)
+            if selected_files is not None and selected_files.mode == "selected"
+            else []
+        )
+        if not discover_workspace_files and not selected_document_ids:
             logger.info(
                 "genreport workspace file discovery skipped organization_id=%s "
                 "workspace_id=%s primary_source_id=%s existing_file_count=%s "
@@ -95,12 +105,22 @@ class ReportInputPreparationService:
             len(files),
         )
         try:
-            document_ids = await self.discovery_agent.discover(
-                query=query,
-                organization_id=organization_id,
-                workspace_id=workspace_id,
-                model=model,
-            )
+            if selected_document_ids:
+                document_ids = selected_document_ids
+                logger.info(
+                    "genreport workspace file discovery replaced by selected scope "
+                    "organization_id=%s workspace_id=%s selected_document_count=%s",
+                    organization_id,
+                    workspace_id,
+                    len(document_ids),
+                )
+            else:
+                document_ids = await self.discovery_agent.discover(
+                    query=query,
+                    organization_id=organization_id,
+                    workspace_id=workspace_id,
+                    model=model,
+                )
             logger.info(
                 "genreport workspace file discovery completed organization_id=%s "
                 "workspace_id=%s discovered_document_count=%s",

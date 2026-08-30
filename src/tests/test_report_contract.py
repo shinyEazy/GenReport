@@ -71,6 +71,18 @@ def valid_payload() -> dict:
 
 
 class ReportExecutionContractTests(unittest.TestCase):
+    def test_accepts_selected_files(self):
+        payload = valid_payload()
+        payload["selected_files"] = {
+            "mode": "selected",
+            "resource_ids": ["document-1"],
+            "resource_names": ["report.pdf"],
+        }
+
+        request = ReportExecutionRequest.model_validate(payload)
+
+        self.assertEqual(request.selected_files.resource_ids, ["document-1"])
+
     def test_accepts_self_contained_report_request(self):
         request = ReportExecutionRequest.model_validate(valid_payload())
 

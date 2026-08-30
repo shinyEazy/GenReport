@@ -10,6 +10,8 @@ from .report_execution import (
     ReportInputsSelected,
     ReportUsage,
     RuntimeGatewayCapability,
+    SelectedFileReferenceRequest,
+    SelectedFilesRequest,
     SelectedReportInput,
 )
 
@@ -25,5 +27,7 @@ __all__ = [
     "ReportInputsSelected",
     "ReportUsage",
     "RuntimeGatewayCapability",
+    "SelectedFileReferenceRequest",
+    "SelectedFilesRequest",
     "SelectedReportInput",
 ]
