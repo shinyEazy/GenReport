@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import json
 from collections.abc import Collection
+from copy import deepcopy
 from dataclasses import dataclass, field
 from importlib import import_module
 from typing import Any
 
 import httpx
 from langchain_core.tools import BaseTool, StructuredTool
+
+
+_INJECTED_SCOPE_FIELDS = frozenset({"organization_id", "workspace_id", "workspace_ids"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,7 +103,7 @@ class MethodHubClient:
             description=(
                 definition.description or f"Method Hub tool {definition.name}"
             ),
-            args_schema=definition.input_schema,
+            args_schema=_agent_input_schema(definition.input_schema),
             infer_schema=False,
         )
 
@@ -193,3 +197,22 @@ def _inject_supported_scope(
     if "workspace_ids" in properties:
         scoped["workspace_ids"] = [workspace_id]
     return scoped
+
+
+def _agent_input_schema(input_schema: dict[str, Any]) -> dict[str, Any]:
+    """Hide runtime-injected scope from the model-visible tool contract."""
+
+    schema = deepcopy(input_schema)
+    properties = schema.get("properties")
+    if isinstance(properties, dict):
+        schema["properties"] = {
+            name: value
+            for name, value in properties.items()
+            if name not in _INJECTED_SCOPE_FIELDS
+        }
+    required = schema.get("required")
+    if isinstance(required, list):
+        schema["required"] = [
+            name for name in required if name not in _INJECTED_SCOPE_FIELDS
+        ]
+    return schema

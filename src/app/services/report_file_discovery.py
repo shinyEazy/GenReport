@@ -278,6 +278,9 @@ def _deduplicate_document_ids(values: list[str], *, limit: int) -> list[str]:
 
 def _system_prompt(workspace_id: str) -> str:
     return (
+        f"Current workspace: {workspace_id}. This is the only workspace for this run. "
+        "The runtime injects this workspace_id into every retrieval tool call. "
+        "Do not ask the user for a workspace_id and do not attempt to select another workspace. "
         "Identify the smallest useful set of existing document_ids needed for "
         "the requested report—usually 1–3 documents and never more than 5. "
         "You have exactly one retrieval call: use corpus_retrieve_context first. "

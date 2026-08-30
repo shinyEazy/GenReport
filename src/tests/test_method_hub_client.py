@@ -106,12 +106,18 @@ class MethodHubLangChainToolTests(unittest.IsolatedAsyncioTestCase):
                         "properties": {
                             "query": {"type": "string"},
                             "organization_id": {"type": "string"},
+                            "workspace_id": {"type": "string"},
                             "workspace_ids": {
                                 "type": "array",
                                 "items": {"type": "string"},
                             },
                         },
-                        "required": ["query"],
+                        "required": [
+                            "query",
+                            "organization_id",
+                            "workspace_id",
+                            "workspace_ids",
+                        ],
                     },
                 )
             ]
@@ -123,6 +129,10 @@ class MethodHubLangChainToolTests(unittest.IsolatedAsyncioTestCase):
             organization_id="test-org",
             workspace_id="workspace-b",
         )
+
+        exposed_schema = tools[0].args_schema
+        self.assertEqual(set(exposed_schema["properties"]), {"query"})
+        self.assertEqual(exposed_schema["required"], ["query"])
         result = await tools[0].ainvoke({"query": "UET admissions"})
 
         self.assertEqual(result, {"results": []})
@@ -131,6 +141,7 @@ class MethodHubLangChainToolTests(unittest.IsolatedAsyncioTestCase):
             {
                 "query": "UET admissions",
                 "organization_id": "test-org",
+                "workspace_id": "workspace-b",
                 "workspace_ids": ["workspace-b"],
             },
         )

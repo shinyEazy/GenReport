@@ -163,6 +163,11 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("exactly one retrieval call", captured["system_prompt"])
         self.assertIn("do not call a retrieval tool again", captured["system_prompt"])
         self.assertIn("complementary evidence", captured["system_prompt"])
+        self.assertIn("Current workspace: workspace-b.", captured["system_prompt"])
+        self.assertIn(
+            "Do not ask the user for a workspace_id",
+            captured["system_prompt"],
+        )
         self.assertEqual(
             method_hub.calls,
             [
