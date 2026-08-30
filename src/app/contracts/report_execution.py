@@ -111,7 +111,9 @@ class SelectedFilesRequest(BaseModel):
     @model_validator(mode="after")
     def validate_selected_resources(self):
         if any(not resource_id.strip() for resource_id in self.resource_ids):
-            raise ValueError("selected_files.resource_ids must not contain blank values")
+            raise ValueError(
+                "selected_files.resource_ids must not contain blank values"
+            )
         if self.mode == "selected" and not self.resource_ids:
             raise ValueError(
                 "selected_files.selected requires at least one resource_id"
@@ -122,9 +124,7 @@ class SelectedFilesRequest(BaseModel):
         if len(set(reference_ids)) != len(reference_ids):
             raise ValueError("selected_files.resource_refs must be unique")
         if any(resource_id not in self.resource_ids for resource_id in reference_ids):
-            raise ValueError(
-                "selected_files.resource_refs must belong to resource_ids"
-            )
+            raise ValueError("selected_files.resource_refs must belong to resource_ids")
         return self
 
 

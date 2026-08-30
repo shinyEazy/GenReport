@@ -34,7 +34,9 @@ def metadata_result(
 
 
 class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_selected_files_stage_requested_documents_without_discovery(self) -> None:
+    async def test_selected_files_stage_requested_documents_without_discovery(
+        self,
+    ) -> None:
         discovery = AsyncMock()
         method_hub = AsyncMock()
         method_hub.call_tool.return_value = metadata_result(
@@ -73,7 +75,9 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
         )
 
         discovery.discover.assert_not_awaited()
-        self.assertEqual([item.document_id for item in prepared.files], ["doc-selected"])
+        self.assertEqual(
+            [item.document_id for item in prepared.files], ["doc-selected"]
+        )
 
     async def test_logs_when_workspace_discovery_is_disabled(self) -> None:
         discovery = AsyncMock()
