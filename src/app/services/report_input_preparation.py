@@ -83,9 +83,8 @@ class ReportInputPreparationService:
         workspace_scope_disabled = (
             selected_files is not None and selected_files.mode == "none"
         )
-        if (
-            workspace_scope_disabled
-            or (not discover_workspace_files and not selected_document_ids)
+        if workspace_scope_disabled or (
+            not discover_workspace_files and not selected_document_ids
         ):
             logger.info(
                 "genreport workspace file discovery skipped organization_id=%s "
