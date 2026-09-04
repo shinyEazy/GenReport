@@ -37,6 +37,20 @@ def citation_manifest(files: Sequence[ExecutionFileRequest]) -> CitationManifest
     )
 
 
+def citation_requirements(files: Sequence[ExecutionFileRequest]) -> str:
+    manifest = citation_manifest(files)
+    if not manifest.references:
+        return ""
+    return (
+        "Use the input-file citation manifest below in the final PDF. Cite each "
+        "substantive factual claim, statistic, comparison, or conclusion from the "
+        "supplied inputs with [n] or [n, m]. Use only manifest numbers. Finish the "
+        "PDF with a References heading and exactly one [n] filename entry for every "
+        "manifest file in order.\n\n"
+        f"{manifest.prompt}"
+    )
+
+
 def validate_report_source(source: str, manifest: CitationManifest) -> None:
     """Ensure source text contains inline markers and every input reference."""
 

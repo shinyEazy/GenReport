@@ -13,6 +13,7 @@ from app.contracts.report_execution import ExecutionFileRequest
 from app.services.axiom_tool_executor import AxiomToolExecutor
 from app.services.local_execution_client import LocalExecutionClient
 from app.services.local_workspace import LocalWorkspace
+from app.services.report_citations import citation_requirements
 from app.services.report_prompt import render_system_prompt
 from app.services.report_tracing import (
     LOCAL_WORKFLOW_TAGS,
@@ -121,6 +122,7 @@ class LocalReportRunner:
                 local_config=local_config,
                 workspace=workspace,
                 available_files=executor.get_available_files_prompt(),
+                citation_instructions=citation_requirements(files),
             )
             generated_files: list[dict[str, Any]] = []
             output_parts: list[str] = []
@@ -223,6 +225,7 @@ class LocalReportRunner:
         local_config: LocalReportConfig,
         workspace: LocalWorkspace,
         available_files: str,
+        citation_instructions: str = "",
     ) -> list[dict[str, str]]:
         return [
             {
@@ -233,6 +236,7 @@ class LocalReportRunner:
                     work_path=workspace.virtual_work_path,
                     output_path=workspace.virtual_outputs_path,
                     available_files=available_files,
+                    citation_instructions=citation_instructions,
                 ),
             },
             {

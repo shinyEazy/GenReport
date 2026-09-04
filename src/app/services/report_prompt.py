@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.contracts.report_execution import ReportExecutionRequest
+from app.services.report_citations import citation_requirements
 
 
 def render_system_prompt(
@@ -12,6 +13,7 @@ def render_system_prompt(
     work_path: str,
     output_path: str,
     available_files: str,
+    citation_instructions: str = "",
 ) -> str:
     return f"""You are the GenReport internal report engine.
 
@@ -21,6 +23,8 @@ Working files and skills: {work_path}
 Authoritative generated outputs: {output_path}
 
 {available_files}
+
+{citation_instructions}
 
 Use only the supplied AXIOM sandbox tools. Each tool call is isolated, so reload
 variables and files on every call. Runtime package installation is prohibited;
@@ -57,6 +61,7 @@ def build_report_messages(
                 work_path=request.execution_context.work_path,
                 output_path=request.execution_context.output_path,
                 available_files=available_files,
+                citation_instructions=citation_requirements(request.execution_files),
             ),
         }
     ]
