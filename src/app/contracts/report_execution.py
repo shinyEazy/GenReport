@@ -158,6 +158,10 @@ class ReportExecutionRequest(BaseModel):
         max_length=20_000,
     )
     primary_source_id: str | None = Field(default=None, max_length=2048)
+    all_inputs_primary: bool = Field(
+        default=False,
+        description="Record every execution file with source metadata as a primary report input.",
+    )
 
     @model_validator(mode="after")
     def validate_run_scope(self):

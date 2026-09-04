@@ -643,6 +643,7 @@ class ReportExecutionService:
             model=request.model,
             primary_source_id=request.primary_source_id,
             selected_files=request.selected_files,
+            all_inputs_primary=request.all_inputs_primary,
         )
 
     async def _stream_llm_round_impl(
