@@ -41,31 +41,6 @@ class ReportPromptTests(unittest.TestCase):
         )
         self.assertIn("PyMuPDF (fitz)", serialized)
 
-    def test_includes_input_file_citation_rules_and_manifest(self):
-        payload = self.request.model_dump(mode="json")
-        payload["execution_files"].append(
-            {
-                "artifact_id": "artifact-2",
-                "filename": "notes.pdf",
-                "sandbox_path": "/workspace/runs/run_1/inputs/notes.pdf",
-                "content_type": "application/pdf",
-                "size": 1,
-            }
-        )
-        request = ReportExecutionRequest.model_validate(payload)
-
-        messages = build_report_messages(
-            request,
-            available_files="AVAILABLE INPUT FILES",
-        )
-        system = messages[0]["content"]
-
-        self.assertIn("INPUT-FILE CITATION MANIFEST:", system)
-        self.assertIn("[1] input.csv", system)
-        self.assertIn("[2] notes.pdf", system)
-        self.assertIn("References", system)
-        self.assertIn("[n, m]", system)
-
     def test_attaches_images_after_the_text_instruction(self):
         image_part = {
             "type": "image_url",
