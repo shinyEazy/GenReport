@@ -73,6 +73,7 @@ class ReportInputPreparationService:
         model: str | None,
         primary_source_id: str | None = None,
         selected_files: SelectedFilesRequest | None = None,
+        all_inputs_primary: bool = False,
     ) -> PreparedReportInputs:
         files = list(existing_files)
         selected_document_ids = (
@@ -96,7 +97,11 @@ class ReportInputPreparationService:
                 len(files),
                 _file_descriptors(files),
             )
-            return _prepared_inputs(files, primary_source_id=primary_source_id)
+            return _prepared_inputs(
+                files,
+                primary_source_id=primary_source_id,
+                all_inputs_primary=all_inputs_primary,
+            )
         if not organization_id or not workspace_id:
             raise ReportInputPreparationError(
                 "Organization and workspace are required for report file discovery"
@@ -142,7 +147,11 @@ class ReportInputPreparationService:
                     workspace_id,
                     exc,
                 )
-                return _prepared_inputs(files, primary_source_id=primary_source_id)
+                return _prepared_inputs(
+                    files,
+                    primary_source_id=primary_source_id,
+                    all_inputs_primary=all_inputs_primary,
+                )
             logger.exception(
                 "Report file discovery failed organization_id=%s workspace_id=%s",
                 organization_id,
@@ -153,7 +162,11 @@ class ReportInputPreparationService:
             ) from exc
 
         if not document_ids:
-            return _prepared_inputs(files, primary_source_id=primary_source_id)
+            return _prepared_inputs(
+                files,
+                primary_source_id=primary_source_id,
+                all_inputs_primary=all_inputs_primary,
+            )
 
         artifacts = await self._resolve_artifacts(
             document_ids=document_ids,
@@ -168,7 +181,11 @@ class ReportInputPreparationService:
                     organization_id,
                     workspace_id,
                 )
-                return _prepared_inputs(files, primary_source_id=primary_source_id)
+                return _prepared_inputs(
+                    files,
+                    primary_source_id=primary_source_id,
+                    all_inputs_primary=all_inputs_primary,
+                )
             raise ReportInputPreparationError(
                 "No related workspace files were selected for this report"
             )
@@ -211,7 +228,11 @@ class ReportInputPreparationService:
             _file_descriptors(related_files),
             len(files),
         )
-        return _prepared_inputs(files, primary_source_id=primary_source_id)
+        return _prepared_inputs(
+            files,
+            primary_source_id=primary_source_id,
+            all_inputs_primary=all_inputs_primary,
+        )
 
     async def _resolve_artifacts(
         self,
@@ -302,6 +323,7 @@ def _prepared_inputs(
     files: list[ExecutionFileRequest],
     *,
     primary_source_id: str | None,
+    all_inputs_primary: bool,
 ) -> PreparedReportInputs:
     unique_files: list[ExecutionFileRequest] = []
     seen: set[str] = set()
@@ -319,12 +341,17 @@ def _prepared_inputs(
             object_key=item.source_object_key or item.artifact_id,
             filename=item.filename,
             content_type=item.content_type,
-            role=("primary" if item.source_id == primary_source_id else "related"),
+            role=(
+                "primary"
+                if all_inputs_primary or item.source_id == primary_source_id
+                else "related"
+            ),
         )
         for item in unique_files
     ]
     if (
         primary_source_id is not None
+        and not all_inputs_primary
         and sum(item.role == "primary" for item in selected_inputs) != 1
     ):
         raise ReportInputPreparationError(

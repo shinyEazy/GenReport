@@ -117,6 +117,50 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("workspace file discovery skipped", output)
         self.assertIn("latest.xlsx", output)
 
+    async def test_marks_all_explicit_execution_files_as_primary(self) -> None:
+        service = ReportInputPreparationService(
+            discovery_agent=AsyncMock(),
+            method_hub=AsyncMock(),
+            runtime_gateway_client=AsyncMock(),
+        )
+        existing = [
+            ExecutionFileRequest(
+                artifact_id="asset-1",
+                filename="first.pdf",
+                sandbox_path="/workspace/runs/resp-1/inputs/first.pdf",
+                content_type="application/pdf",
+                size=10,
+                source_id="source-1",
+                source_object_key="organizations/test-org/sources/first.pdf",
+            ),
+            ExecutionFileRequest(
+                artifact_id="asset-2",
+                filename="second.pdf",
+                sandbox_path="/workspace/runs/resp-1/inputs/second.pdf",
+                content_type="application/pdf",
+                size=10,
+                source_id="source-2",
+                source_object_key="organizations/test-org/sources/second.pdf",
+            ),
+        ]
+
+        prepared = await service.prepare(
+            query="Create one report from the selected files",
+            existing_files=existing,
+            discover_workspace_files=False,
+            organization_id="test-org",
+            workspace_id="workspace-b",
+            runtime_gateway=None,
+            model="test-model",
+            primary_source_id="source-1",
+            all_inputs_primary=True,
+        )
+
+        self.assertEqual(
+            [item.role for item in prepared.selected_inputs],
+            ["primary", "primary"],
+        )
+
     async def test_resolves_document_ids_and_stages_authoritative_metadata(
         self,
     ) -> None:
