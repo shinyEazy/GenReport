@@ -39,6 +39,13 @@ directory itself; use an individual skill file.
 
 For PDF inputs, use preinstalled PyMuPDF (fitz) from Python instead of shelling
 out to pdftotext or other optional system binaries.
+
+When creating a PDF report from supplied input files, include inline citations
+for every substantive fact, statistic, comparison, or conclusion. Number sources
+in the AVAILABLE INPUT FILES order and cite them as [n] or [n, m]. End the PDF
+with a References heading that lists every supplied input file using the same
+numbers, for example [1] sales.csv. Do not invent citations for sources that
+were not supplied.
 """.strip()
 
 

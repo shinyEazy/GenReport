@@ -41,6 +41,16 @@ class ReportPromptTests(unittest.TestCase):
         )
         self.assertIn("PyMuPDF (fitz)", serialized)
 
+    def test_requires_inline_citations_and_references_for_input_backed_reports(self):
+        system = build_report_messages(
+            self.request,
+            available_files="AVAILABLE INPUT FILES:\n- input.csv",
+        )[0]["content"]
+
+        self.assertIn("[n] or [n, m]", system)
+        self.assertIn("References", system)
+        self.assertIn("AVAILABLE INPUT FILES order", system)
+
     def test_attaches_images_after_the_text_instruction(self):
         image_part = {
             "type": "image_url",
