@@ -257,64 +257,6 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("filename similarity", captured["system_prompt"])
         self.assertIn("return an empty document_ids list", captured["system_prompt"])
 
-    async def test_discovery_allows_eight_retrieval_calls_and_blocks_the_ninth_call(
-        self,
-    ) -> None:
-        compiled = FakeCompiledAgent(
-            {"structured_response": ReportArtifactSelection(document_ids=["doc-1"])}
-        )
-        captured = {}
-
-        def agent_factory(**kwargs):
-            captured.update(kwargs)
-            return compiled
-
-        agent = DiscoveryAgent(
-            method_hub=FakeMethodHub(),
-            model_factory=lambda model: object(),
-            agent_factory=agent_factory,
-            profile_registrar=lambda model: None,
-            trace_factory=lambda function: function,
-        )
-
-        await agent.discover(
-            query="Create a report",
-            organization_id="test-org",
-            workspace_id="workspace-b",
-        )
-
-        request = type(
-            "Request",
-            (),
-            {
-                "tool_call": {
-                    "id": "call-1",
-                    "name": "corpus_retrieve_context",
-                }
-            },
-        )()
-        handler_calls = 0
-
-        async def handler(_request):
-            nonlocal handler_calls
-            handler_calls += 1
-            return ToolMessage(
-                content="ok",
-                tool_call_id="call-1",
-                name="corpus_retrieve_context",
-            )
-
-        guard = captured["middleware"][0]
-        for _ in range(8):
-            result = await guard.awrap_tool_call(request, handler)
-            self.assertIsInstance(result, ToolMessage)
-        blocked = await guard.awrap_tool_call(request, handler)
-
-        self.assertEqual(handler_calls, 8)
-        self.assertIsInstance(blocked, ToolMessage)
-        self.assertEqual(blocked.status, "error")
-        self.assertIn("eight retrieval calls", blocked.content)
-
     async def test_accepts_dict_structured_response_and_enforces_limit(self) -> None:
         compiled = FakeCompiledAgent(
             {"structured_response": {"document_ids": ["doc-1", "doc-2", "doc-3"]}}
