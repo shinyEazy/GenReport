@@ -156,3 +156,14 @@ document ID, report preparation resolves it by its original object key within th
 current workspace and carries the resolved ID into prepared inputs. Invalid or
 unindexed resolutions do not fall back to a filename-only discovery query. The
 report path no longer truncates the combined seed context to 6,000 characters.
+
+### Organization tool bindings
+
+Before binding discovery tools, GenReport intersects its retrieval-tool allowlist
+with the organization's registered tools from Authz. Set `TOOL_SUBSCRIPTIONS_API_URL`
+to the gateway endpoint (default
+`http://host.docker.internal:8007/authz-service/api/v1/authz/me/tool-subscriptions`).
+The user bearer identifies the organization; the response must match the requested
+organization. Empty registrations bind no tools; lookup failures never enable the
+full catalog as a fallback. Raw MethodHub listing and internal preparation calls
+are unchanged. Register retrieval tools in the Tools UI before running discovery.

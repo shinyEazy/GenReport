@@ -32,6 +32,21 @@ class MethodHubClientCompatibilityTests(unittest.TestCase):
 
 
 class MethodHubLangChainToolTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        subscription_patch = patch(
+            "app.services.method_hub_client.registered_tool_names",
+            AsyncMock(
+                return_value={
+                    "corpus_bm25_search",
+                    "corpus_retrieve_context",
+                    "corpus_get_file_ingested_data",
+                    "corpus_vector_search",
+                }
+            ),
+        )
+        subscription_patch.start()
+        self.addCleanup(subscription_patch.stop)
+
     async def test_session_keeps_sse_stream_open_for_slow_tool_results(self) -> None:
         class FakeSession:
             def __init__(self, *_args) -> None:

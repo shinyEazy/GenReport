@@ -18,6 +18,7 @@ services:
       UV_SYSTEM_PYTHON: "1"
       UV_LINK_MODE: copy
       PYTHONDONTWRITEBYTECODE: "1"
+      TOOL_SUBSCRIPTIONS_API_URL: ${TOOL_SUBSCRIPTIONS_API_URL:-http://host.docker.internal:8007/authz-service/api/v1/authz/me/tool-subscriptions}
       METHOD_HUB_MCP_URL: ${METHOD_HUB_MCP_URL:-http://host.docker.internal:38000/mcp}
     command:
       - /bin/sh

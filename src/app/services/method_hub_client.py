@@ -10,6 +10,8 @@ from typing import Any
 import httpx
 from langchain_core.tools import BaseTool, StructuredTool
 
+from app.services.tool_subscriptions import registered_tool_names
+
 
 _INJECTED_SCOPE_FIELDS = frozenset({"organization_id", "workspace_id", "workspace_ids"})
 
@@ -70,7 +72,12 @@ class MethodHubClient:
         organization_id: str,
         workspace_id: str,
     ) -> list[BaseTool]:
-        allowed = set(allowed_names)
+        allowed = set(allowed_names) & await registered_tool_names(
+            organization_id,
+            self.authorization,
+        )
+        if not allowed:
+            return []
         definitions = [tool for tool in await self.list_tools() if tool.name in allowed]
         return [
             self._create_langchain_tool(
