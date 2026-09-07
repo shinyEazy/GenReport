@@ -190,7 +190,9 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(compiled.calls[0][1], {"recursion_limit": 17})
 
-    async def test_discovery_prompt_requires_direct_primary_context_relevance(self) -> None:
+    async def test_discovery_prompt_requires_direct_primary_context_relevance(
+        self,
+    ) -> None:
         compiled = FakeCompiledAgent(
             {"structured_response": ReportArtifactSelection(document_ids=[])}
         )

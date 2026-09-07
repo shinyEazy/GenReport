@@ -257,7 +257,9 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             ["primary", "primary", "related"],
         )
         staged_artifacts = runtime_gateway.stage_report_inputs.await_args.args[1]
-        self.assertEqual([item["document_id"] for item in staged_artifacts], ["doc-related"])
+        self.assertEqual(
+            [item["document_id"] for item in staged_artifacts], ["doc-related"]
+        )
 
     async def test_discovery_query_includes_primary_document_overviews(self) -> None:
         existing = [
