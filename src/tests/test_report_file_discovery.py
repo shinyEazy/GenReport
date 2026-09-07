@@ -160,9 +160,14 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("smallest useful set", captured["system_prompt"])
         self.assertIn("usually 1–3", captured["system_prompt"])
         self.assertIn("never more than 5", captured["system_prompt"])
-        self.assertIn("exactly one retrieval call", captured["system_prompt"])
-        self.assertIn("do not call a retrieval tool again", captured["system_prompt"])
-        self.assertIn("complementary evidence", captured["system_prompt"])
+        self.assertIn("up to eight retrieval-tool calls", captured["system_prompt"])
+        self.assertIn("multiple query angles", captured["system_prompt"])
+        self.assertIn("shared keywords alone", captured["system_prompt"])
+        self.assertIn(
+            "evidence, method_or_baseline, comparison, or dataset_or_context",
+            captured["system_prompt"],
+        )
+        self.assertIn("at most 5 related document_ids", captured["system_prompt"])
         self.assertIn("Current workspace: workspace-b.", captured["system_prompt"])
         self.assertIn(
             "Do not ask the user for a workspace_id",
@@ -185,7 +190,74 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(compiled.calls[0][1], {"recursion_limit": 17})
 
-    async def test_discovery_blocks_retrieval_after_the_first_call(self) -> None:
+    async def test_discovery_prompt_requires_direct_primary_context_relevance(self) -> None:
+        compiled = FakeCompiledAgent(
+            {"structured_response": ReportArtifactSelection(document_ids=[])}
+        )
+        captured = {}
+
+        def agent_factory(**kwargs):
+            captured.update(kwargs)
+            return compiled
+
+        agent = DiscoveryAgent(
+            method_hub=FakeMethodHub(),
+            model_factory=lambda model: object(),
+            agent_factory=agent_factory,
+            profile_registrar=lambda model: None,
+            trace_factory=lambda function: function,
+        )
+
+        await agent.discover(
+            query=(
+                "Create a report\n\n"
+                "PRIMARY DOCUMENT CONTEXT (use only as relevance criteria):\n"
+                "- primary.pdf [doc-primary]\n  Graph-based vulnerability detection"
+            ),
+            organization_id="test-org",
+            workspace_id="workspace-b",
+        )
+
+        self.assertIn(
+            "directly supports, explains, compares, or contextualizes",
+            captured["system_prompt"],
+        )
+        self.assertIn("return an empty document_ids list", captured["system_prompt"])
+
+    async def test_discovery_prompt_rejects_keyword_only_noise(self) -> None:
+        compiled = FakeCompiledAgent(
+            {"structured_response": ReportArtifactSelection(document_ids=[])}
+        )
+        captured = {}
+
+        def agent_factory(**kwargs):
+            captured.update(kwargs)
+            return compiled
+
+        agent = DiscoveryAgent(
+            method_hub=FakeMethodHub(),
+            model_factory=lambda model: object(),
+            agent_factory=agent_factory,
+            profile_registrar=lambda model: None,
+            trace_factory=lambda function: function,
+        )
+
+        await agent.discover(
+            query=(
+                "Create a report\n\n"
+                "PRIMARY DOCUMENT CONTEXT (use only as relevance criteria):\n"
+                "- primary.pdf [doc-primary]\n  Graph-based vulnerability detection"
+            ),
+            organization_id="test-org",
+            workspace_id="workspace-b",
+        )
+
+        self.assertIn("filename similarity", captured["system_prompt"])
+        self.assertIn("return an empty document_ids list", captured["system_prompt"])
+
+    async def test_discovery_allows_eight_retrieval_calls_and_blocks_the_ninth_call(
+        self,
+    ) -> None:
         compiled = FakeCompiledAgent(
             {"structured_response": ReportArtifactSelection(document_ids=["doc-1"])}
         )
@@ -231,13 +303,15 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
             )
 
         guard = captured["middleware"][0]
-        await guard.awrap_tool_call(request, handler)
+        for _ in range(8):
+            result = await guard.awrap_tool_call(request, handler)
+            self.assertIsInstance(result, ToolMessage)
         blocked = await guard.awrap_tool_call(request, handler)
 
-        self.assertEqual(handler_calls, 1)
+        self.assertEqual(handler_calls, 8)
         self.assertIsInstance(blocked, ToolMessage)
         self.assertEqual(blocked.status, "error")
-        self.assertIn("do not call", blocked.content)
+        self.assertIn("eight retrieval calls", blocked.content)
 
     async def test_accepts_dict_structured_response_and_enforces_limit(self) -> None:
         compiled = FakeCompiledAgent(

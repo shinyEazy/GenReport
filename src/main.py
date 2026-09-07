@@ -48,6 +48,7 @@ async def capabilities() -> dict[str, object]:
         "endpoints": [
             "POST /api/v1/reports:stream",
             "POST /api/v1/reports:extract-dashboard",
+            "POST /api/v1/reports:discover-related",
         ],
         "persistence": False,
         "execution_backend": "axiom-runtime-gateway",

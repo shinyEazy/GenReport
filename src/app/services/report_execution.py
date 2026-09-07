@@ -642,6 +642,7 @@ class ReportExecutionService:
             runtime_gateway=request.runtime_gateway.model_dump(mode="json"),
             model=request.model,
             primary_source_id=request.primary_source_id,
+            primary_source_ids=request.primary_source_ids,
             selected_files=request.selected_files,
             all_inputs_primary=request.all_inputs_primary,
         )

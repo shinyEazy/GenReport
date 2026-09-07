@@ -27,7 +27,7 @@ REPORT_RETRIEVAL_TOOL_NAMES = {
     "corpus_bm25_search",
     "corpus_get_file_ingested_data",
 }
-MAX_REPORT_RETRIEVAL_TOOL_CALLS = 1
+MAX_REPORT_RETRIEVAL_TOOL_CALLS = 10
 
 _HIDDEN_DEEP_AGENT_TOOLS = frozenset(
     {
@@ -98,7 +98,7 @@ def _limit_retrieval_tool_calls(max_calls: int = MAX_REPORT_RETRIEVAL_TOOL_CALLS
                     {
                         "success": False,
                         "error_type": "RetrievalLimitExceeded",
-                        "error": "Discovery has already used its one retrieval call.",
+                        "error": "Discovery has already used its eight retrieval calls.",
                         "instruction": (
                             "do not call retrieval tools again. Use the retrieved "
                             "results and return the structured document_ids selection now."
@@ -283,11 +283,19 @@ def _system_prompt(workspace_id: str) -> str:
         "Do not ask the user for a workspace_id and do not attempt to select another workspace. "
         "Identify the smallest useful set of existing document_ids needed for "
         "the requested report—usually 1–3 documents and never more than 5. "
-        "You have exactly one retrieval call: use corpus_retrieve_context first. "
-        "After that call returns, do not call a retrieval tool again; use its "
-        "results to select the relevant document ids. Select additional ids only "
-        "when they provide material, complementary evidence; do not add loosely "
-        "related files. Do not inspect full ingested data. "
+        "You may make up to eight retrieval-tool calls. Search broadly from the "
+        "request and PRIMARY DOCUMENT CONTEXT, using multiple query angles when "
+        "useful. Inspect and compare candidates before selecting at most 5 related "
+        "document_ids. Never select a primary document again or a duplicate source. "
+        "Do not select documents based on shared keywords alone, broad domain "
+        "membership, filename similarity, or generic background. Select only "
+        "documents whose tool output shows a direct contribution to the primary "
+        "context: it directly supports, explains, compares, or contextualizes that "
+        "context, and has one concrete role: evidence, method_or_baseline, comparison, "
+        "or dataset_or_context. Prefer the strongest direct-evidence candidate when "
+        "documents duplicate a role or topic. If the relationship or role is not "
+        "supported, exclude the candidate; return an empty document_ids list when "
+        "no candidate qualifies. Do not inspect full ingested data. "
         "Return only document ids supported by tool results; never invent ids. "
         "For normal chit-chat or when no relevant document exists, return an "
         "empty document_ids list."

@@ -136,3 +136,23 @@ database directory.
 cd backend
 python -m unittest discover -s tests -v
 ```
+
+### Related files without report generation
+
+`POST /api/v1/reports:discover-related` accepts `organization_id`, `workspace_id`,
+and 1–20 `files` with `document_id`, `object_key`, and `bucket`. The internal caller
+must validate workspace access and forward `X-Axiom-User-Authorization` and
+`X-Org-ID`, as in the report flow. The engine validates seed corpus metadata,
+uses indexed overviews as context for the existing DiscoveryAgent, and returns
+`files` containing `document_id`, `object_key`, `bucket`, and `filename`.
+It excludes seed documents and creates no report or sandbox. The public
+intelligence-service endpoint verifies returned source ownership before exposing
+results to the browser.
+
+Report generation and related-file search share the overview loader, per-document
+context formatting (2,000 characters per document), and relevance prompt in
+`app/services/discovery_context.py`. When a staged primary source has no corpus
+document ID, report preparation resolves it by its original object key within the
+current workspace and carries the resolved ID into prepared inputs. Invalid or
+unindexed resolutions do not fall back to a filename-only discovery query. The
+report path no longer truncates the combined seed context to 6,000 characters.

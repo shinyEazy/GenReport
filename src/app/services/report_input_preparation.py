@@ -5,6 +5,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from app.services.discovery_context import (
+    format_seed_context,
+    related_discovery_query,
+    load_seed_overview,
+)
+
 from app.contracts.report_execution import (
     ExecutionFileRequest,
     SelectedFilesRequest,
@@ -72,10 +78,11 @@ class ReportInputPreparationService:
         runtime_gateway: dict[str, Any] | None,
         model: str | None,
         primary_source_id: str | None = None,
+        primary_source_ids: list[str] | None = None,
         selected_files: SelectedFilesRequest | None = None,
         all_inputs_primary: bool = False,
     ) -> PreparedReportInputs:
-        files = list(existing_files)
+        files = [file.model_copy() for file in existing_files]
         selected_document_ids = (
             list(selected_files.resource_ids)
             if selected_files is not None and selected_files.mode == "selected"
@@ -100,6 +107,7 @@ class ReportInputPreparationService:
             return _prepared_inputs(
                 files,
                 primary_source_id=primary_source_id,
+                primary_source_ids=primary_source_ids,
                 all_inputs_primary=all_inputs_primary,
             )
         if not organization_id or not workspace_id:
@@ -125,8 +133,20 @@ class ReportInputPreparationService:
                     len(document_ids),
                 )
             else:
+                primary_context = await self._primary_discovery_context(
+                    files=files,
+                    primary_source_ids=_effective_primary_source_ids(
+                        primary_source_ids,
+                        primary_source_id,
+                    ),
+                    organization_id=organization_id,
+                    workspace_id=workspace_id,
+                )
+                discovery_query = query
+                if primary_context:
+                    discovery_query = related_discovery_query(primary_context)
                 document_ids = await self.discovery_agent.discover(
-                    query=query,
+                    query=discovery_query,
                     organization_id=organization_id,
                     workspace_id=workspace_id,
                     model=model,
@@ -150,6 +170,7 @@ class ReportInputPreparationService:
                 return _prepared_inputs(
                     files,
                     primary_source_id=primary_source_id,
+                    primary_source_ids=primary_source_ids,
                     all_inputs_primary=all_inputs_primary,
                 )
             logger.exception(
@@ -165,6 +186,7 @@ class ReportInputPreparationService:
             return _prepared_inputs(
                 files,
                 primary_source_id=primary_source_id,
+                primary_source_ids=primary_source_ids,
                 all_inputs_primary=all_inputs_primary,
             )
 
@@ -173,6 +195,7 @@ class ReportInputPreparationService:
             organization_id=organization_id,
             workspace_id=workspace_id,
         )
+        artifacts = _without_existing_artifacts(artifacts, files)
         if not artifacts:
             if files:
                 logger.warning(
@@ -184,6 +207,7 @@ class ReportInputPreparationService:
                 return _prepared_inputs(
                     files,
                     primary_source_id=primary_source_id,
+                    primary_source_ids=primary_source_ids,
                     all_inputs_primary=all_inputs_primary,
                 )
             raise ReportInputPreparationError(
@@ -199,6 +223,20 @@ class ReportInputPreparationService:
                 ExecutionFileRequest.model_validate(item) for item in staged
             ]
         except Exception as exc:
+            if files:
+                logger.warning(
+                    "Related report input staging failed organization_id=%s "
+                    "workspace_id=%s; retaining existing report inputs: %s",
+                    organization_id,
+                    workspace_id,
+                    exc,
+                )
+                return _prepared_inputs(
+                    files,
+                    primary_source_id=primary_source_id,
+                    primary_source_ids=primary_source_ids,
+                    all_inputs_primary=all_inputs_primary,
+                )
             logger.exception(
                 "Report input staging failed organization_id=%s workspace_id=%s",
                 organization_id,
@@ -231,6 +269,7 @@ class ReportInputPreparationService:
         return _prepared_inputs(
             files,
             primary_source_id=primary_source_id,
+            primary_source_ids=primary_source_ids,
             all_inputs_primary=all_inputs_primary,
         )
 
@@ -294,6 +333,73 @@ class ReportInputPreparationService:
             )
         return artifacts
 
+    async def _primary_discovery_context(
+        self,
+        *,
+        files: list[ExecutionFileRequest],
+        primary_source_ids: set[str],
+        organization_id: str,
+        workspace_id: str,
+    ) -> str:
+        if not primary_source_ids:
+            return ""
+        entries: list[str] = []
+        seen_document_ids: set[str] = set()
+        for file in files:
+            source_id = file.source_id or file.artifact_id
+            document_id = (file.document_id or "").strip()
+            if source_id not in primary_source_ids or document_id in seen_document_ids:
+                continue
+            resolving_source = not document_id
+            if document_id:
+                seen_document_ids.add(document_id)
+            try:
+                result = await load_seed_overview(
+                    self.method_hub,
+                    document_id=document_id or None,
+                    object_key=file.source_object_key,
+                    workspace_id=workspace_id,
+                )
+                if not document_id:
+                    payload = _overview_payload(result)
+                    metadata = payload.get("document") if payload else None
+                    if (
+                        not isinstance(metadata, dict)
+                        or metadata.get("workspace_id") != workspace_id
+                        or metadata.get("object_key") != file.source_object_key
+                        or not _first_string(metadata.get("document_id"))
+                    ):
+                        raise ReportInputPreparationError(
+                            "Unable to resolve the selected source to an indexed document."
+                        )
+                    document_id = metadata["document_id"]
+                    file.document_id = document_id
+            except Exception:
+                if resolving_source:
+                    raise
+                logger.warning(
+                    "Report primary overview lookup failed organization_id=%s "
+                    "workspace_id=%s document_id=%s",
+                    organization_id,
+                    workspace_id,
+                    document_id,
+                    exc_info=True,
+                )
+                continue
+            overview = _overview_text(result)
+            if not overview:
+                if resolving_source:
+                    raise ReportInputPreparationError(
+                        "The selected source has no indexed overview."
+                    )
+                continue
+            filename = _overview_filename(result) or file.filename
+            entries.append(format_seed_context(document_id, overview, filename))
+
+        if not entries:
+            return ""
+        return "\n\n".join(entries)
+
 
 @dataclass(frozen=True, slots=True)
 class PreparedReportInputs:
@@ -323,6 +429,7 @@ def _prepared_inputs(
     files: list[ExecutionFileRequest],
     *,
     primary_source_id: str | None,
+    primary_source_ids: list[str] | None,
     all_inputs_primary: bool,
 ) -> PreparedReportInputs:
     unique_files: list[ExecutionFileRequest] = []
@@ -334,6 +441,11 @@ def _prepared_inputs(
         seen.add(identity)
         unique_files.append(item)
 
+    effective_primary_source_ids = _effective_primary_source_ids(
+        primary_source_ids,
+        primary_source_id,
+    )
+
     selected_inputs = [
         SelectedReportInput(
             source_id=item.source_id or item.artifact_id,
@@ -343,21 +455,84 @@ def _prepared_inputs(
             content_type=item.content_type,
             role=(
                 "primary"
-                if all_inputs_primary or item.source_id == primary_source_id
+                if all_inputs_primary
+                or (item.source_id or item.artifact_id) in effective_primary_source_ids
                 else "related"
             ),
         )
         for item in unique_files
     ]
     if (
-        primary_source_id is not None
+        effective_primary_source_ids
         and not all_inputs_primary
-        and sum(item.role == "primary" for item in selected_inputs) != 1
+        and {item.source_id for item in selected_inputs if item.role == "primary"}
+        != effective_primary_source_ids
     ):
         raise ReportInputPreparationError(
-            "primary source must match exactly one selected report input"
+            "primary sources must match selected report inputs"
         )
     return PreparedReportInputs(files=unique_files, selected_inputs=selected_inputs)
+
+
+def _without_existing_artifacts(
+    artifacts: list[SelectedReportArtifact],
+    files: list[ExecutionFileRequest],
+) -> list[SelectedReportArtifact]:
+    existing_source_ids = {item.source_id for item in files if item.source_id}
+    existing_document_ids = {item.document_id for item in files if item.document_id}
+    existing_object_keys = {
+        item.source_object_key or item.artifact_id for item in files
+    }
+    return [
+        artifact
+        for artifact in artifacts
+        if artifact.source_id not in existing_source_ids
+        and artifact.document_id not in existing_document_ids
+        and artifact.artifact_id not in existing_object_keys
+    ]
+
+
+def _effective_primary_source_ids(
+    primary_source_ids: list[str] | None,
+    primary_source_id: str | None,
+) -> set[str]:
+    effective_source_ids = set(primary_source_ids or [])
+    if not effective_source_ids and primary_source_id is not None:
+        effective_source_ids.add(primary_source_id)
+    return effective_source_ids
+
+
+def _overview_payload(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    result = value.get("result")
+    return result if isinstance(result, dict) else value
+
+
+def _overview_filename(value: Any) -> str | None:
+    payload = _overview_payload(value)
+    document = payload.get("document") if payload is not None else None
+    if not isinstance(document, dict):
+        return None
+    return _first_string(document.get("file_name"), document.get("filename"))
+
+
+def _overview_text(value: Any) -> str:
+    payload = _overview_payload(value)
+    if payload is None:
+        return ""
+    parts: list[str] = []
+    for key in ("contents", "chunks"):
+        items = payload.get(key)
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            text = _first_string(item.get("text"), item.get("content"))
+            if text:
+                parts.append(text)
+    return "\n".join(parts)
 
 
 def _find_document_metadata(

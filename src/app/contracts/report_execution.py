@@ -158,6 +158,7 @@ class ReportExecutionRequest(BaseModel):
         max_length=20_000,
     )
     primary_source_id: str | None = Field(default=None, max_length=2048)
+    primary_source_ids: list[str] = Field(default_factory=list, max_length=100)
     all_inputs_primary: bool = Field(
         default=False,
         description="Record every execution file with source metadata as a primary report input.",
@@ -184,6 +185,28 @@ class ReportExecutionRequest(BaseModel):
                 raise ValueError(
                     "primary_source_id must match exactly one execution file source_id"
                 )
+        normalized_primary_source_ids: list[str] = []
+        for source_id in self.primary_source_ids:
+            normalized_source_id = source_id.strip()
+            if not normalized_source_id:
+                raise ValueError("primary_source_ids must not contain blank values")
+            if normalized_source_id in normalized_primary_source_ids:
+                raise ValueError("primary_source_ids must not contain duplicate values")
+            primary_count = sum(
+                item.source_id == normalized_source_id for item in self.execution_files
+            )
+            if primary_count != 1:
+                raise ValueError(
+                    "primary_source_ids must each match exactly one execution file source_id"
+                )
+            normalized_primary_source_ids.append(normalized_source_id)
+        if (
+            self.primary_source_id is not None
+            and normalized_primary_source_ids
+            and self.primary_source_id not in normalized_primary_source_ids
+        ):
+            raise ValueError("primary_source_id must be included in primary_source_ids")
+        self.primary_source_ids = normalized_primary_source_ids
         return self
 
 

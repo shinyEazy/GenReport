@@ -141,6 +141,37 @@ class ReportExecutionContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "primary_source_id"):
             ReportExecutionRequest.model_validate(payload)
 
+    def test_primary_source_ids_must_match_staged_execution_files(self):
+        payload = valid_payload()
+        payload["execution_files"] = [
+            {
+                "artifact_id": "artifact-1",
+                "filename": "first.csv",
+                "sandbox_path": "/workspace/runs/run_1/inputs/first.csv",
+                "content_type": "text/csv",
+                "size": 10,
+                "source_id": "source-a",
+            },
+            {
+                "artifact_id": "artifact-2",
+                "filename": "second.csv",
+                "sandbox_path": "/workspace/runs/run_1/inputs/second.csv",
+                "content_type": "text/csv",
+                "size": 10,
+                "source_id": "source-b",
+            },
+        ]
+        payload["primary_source_id"] = "source-a"
+        payload["primary_source_ids"] = ["source-a", "source-b"]
+
+        request = ReportExecutionRequest.model_validate(payload)
+
+        self.assertEqual(request.primary_source_ids, ["source-a", "source-b"])
+
+        payload["primary_source_ids"] = ["source-a", "source-missing"]
+        with self.assertRaisesRegex(ValidationError, "primary_source_ids"):
+            ReportExecutionRequest.model_validate(payload)
+
     def test_event_factory_emits_complete_correlation_envelope(self):
         request = ReportExecutionRequest.model_validate(valid_payload())
         usage = ReportUsage(

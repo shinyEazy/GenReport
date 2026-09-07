@@ -32,6 +32,7 @@ class MainApplicationTests(unittest.IsolatedAsyncioTestCase):
             [
                 "POST /api/v1/reports:stream",
                 "POST /api/v1/reports:extract-dashboard",
+                "POST /api/v1/reports:discover-related",
             ],
         )
         self.assertFalse(response.json()["persistence"])

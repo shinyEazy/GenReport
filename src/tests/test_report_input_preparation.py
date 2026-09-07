@@ -161,6 +161,232 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             ["primary", "primary"],
         )
 
+    async def test_discovery_stages_only_new_related_files_after_selected_primaries(
+        self,
+    ) -> None:
+        existing = [
+            ExecutionFileRequest(
+                artifact_id="asset-primary-a",
+                filename="primary-a.pdf",
+                sandbox_path="/workspace/runs/resp-1/inputs/primary-a.pdf",
+                content_type="application/pdf",
+                size=10,
+                source_id="source-primary-a",
+                document_id="doc-primary-a",
+                source_object_key="organizations/test-org/sources/primary-a.pdf",
+            ),
+            ExecutionFileRequest(
+                artifact_id="asset-primary-b",
+                filename="primary-b.pdf",
+                sandbox_path="/workspace/runs/resp-1/inputs/primary-b.pdf",
+                content_type="application/pdf",
+                size=10,
+                source_id="source-primary-b",
+                document_id="doc-primary-b",
+                source_object_key="organizations/test-org/sources/primary-b.pdf",
+            ),
+        ]
+        discovery = AsyncMock()
+        discovery.discover.return_value = [
+            "doc-primary-a",
+            "doc-related",
+            "doc-primary-b",
+        ]
+        method_hub = AsyncMock()
+        method_hub.call_tool.side_effect = [
+            metadata_result(
+                "doc-primary-a",
+                filename="primary-a.pdf",
+                source_id="source-primary-a",
+            ),
+            metadata_result(
+                "doc-primary-b",
+                filename="primary-b.pdf",
+                source_id="source-primary-b",
+            ),
+            metadata_result(
+                "doc-primary-a",
+                filename="primary-a.pdf",
+                source_id="source-primary-a",
+            ),
+            metadata_result(
+                "doc-related",
+                filename="related.pdf",
+                source_id="source-related",
+            ),
+            metadata_result(
+                "doc-primary-b",
+                filename="primary-b.pdf",
+                source_id="source-primary-b",
+            ),
+        ]
+        runtime_gateway = AsyncMock()
+        runtime_gateway.stage_report_inputs.return_value = [
+            {
+                "artifact_id": "asset-related",
+                "filename": "related.pdf",
+                "sandbox_path": "/workspace/runs/resp-1/inputs/related.pdf",
+                "content_type": "application/pdf",
+                "size": 10,
+            }
+        ]
+        service = ReportInputPreparationService(
+            discovery_agent=discovery,
+            method_hub=method_hub,
+            runtime_gateway_client=runtime_gateway,
+        )
+
+        prepared = await service.prepare(
+            query="Create one report from the selected files",
+            existing_files=existing,
+            discover_workspace_files=True,
+            organization_id="test-org",
+            workspace_id="workspace-b",
+            runtime_gateway={},
+            model="test-model",
+            primary_source_id="source-primary-a",
+            primary_source_ids=["source-primary-a", "source-primary-b"],
+        )
+
+        self.assertEqual(
+            [item.source_id for item in prepared.files],
+            ["source-primary-a", "source-primary-b", "source-related"],
+        )
+        self.assertEqual(
+            [item.role for item in prepared.selected_inputs],
+            ["primary", "primary", "related"],
+        )
+        staged_artifacts = runtime_gateway.stage_report_inputs.await_args.args[1]
+        self.assertEqual([item["document_id"] for item in staged_artifacts], ["doc-related"])
+
+    async def test_discovery_query_includes_primary_document_overviews(self) -> None:
+        existing = [
+            ExecutionFileRequest(
+                artifact_id="asset-primary-a",
+                filename="primary-a.pdf",
+                sandbox_path="/workspace/runs/resp-1/inputs/primary-a.pdf",
+                content_type="application/pdf",
+                size=10,
+                source_id="source-primary-a",
+                document_id="doc-primary-a",
+            ),
+            ExecutionFileRequest(
+                artifact_id="asset-primary-b",
+                filename="primary-b.pdf",
+                sandbox_path="/workspace/runs/resp-1/inputs/primary-b.pdf",
+                content_type="application/pdf",
+                size=10,
+                source_id="source-primary-b",
+                document_id="doc-primary-b",
+            ),
+        ]
+        discovery = AsyncMock()
+        discovery.discover.return_value = []
+        method_hub = AsyncMock()
+        method_hub.call_tool.side_effect = [
+            {
+                "result": {
+                    "document": {
+                        "document_id": "doc-primary-a",
+                        "file_name": "primary-a.pdf",
+                    },
+                    "contents": [
+                        {
+                            "text": "Primary A studies graph-based vulnerability detection."
+                        }
+                    ],
+                    "chunks": [],
+                }
+            },
+            {
+                "result": {
+                    "document": {
+                        "document_id": "doc-primary-b",
+                        "file_name": "primary-b.pdf",
+                    },
+                    "contents": [
+                        {"text": "Primary B evaluates cross-project robustness."}
+                    ],
+                    "chunks": [],
+                }
+            },
+        ]
+        service = ReportInputPreparationService(
+            discovery_agent=discovery,
+            method_hub=method_hub,
+            runtime_gateway_client=AsyncMock(),
+        )
+
+        prepared = await service.prepare(
+            query="Create one report from the selected files",
+            existing_files=existing,
+            discover_workspace_files=True,
+            organization_id="test-org",
+            workspace_id="workspace-b",
+            runtime_gateway={},
+            model="test-model",
+            primary_source_id="source-primary-a",
+            primary_source_ids=["source-primary-a", "source-primary-b"],
+        )
+
+        discovery_query = discovery.discover.await_args.kwargs["query"]
+        self.assertIn("PRIMARY DOCUMENT CONTEXT", discovery_query)
+        self.assertIn("graph-based vulnerability detection", discovery_query)
+        method_hub.call_tool.assert_any_await(
+            "corpus_get_file_ingested_data",
+            {
+                "document_id": "doc-primary-a",
+                "workspace_id": "workspace-b",
+                "mode": "overview",
+                "output_compression": "none",
+            },
+        )
+        self.assertEqual(prepared.files, existing)
+
+    async def test_primary_overview_lookup_failure_falls_back_to_instruction_only_discovery(
+        self,
+    ) -> None:
+        existing = [
+            ExecutionFileRequest(
+                artifact_id="asset-primary",
+                filename="primary.pdf",
+                sandbox_path="/workspace/runs/resp-1/inputs/primary.pdf",
+                content_type="application/pdf",
+                size=10,
+                source_id="source-primary",
+                document_id="doc-primary",
+            )
+        ]
+        discovery = AsyncMock()
+        discovery.discover.return_value = []
+        method_hub = AsyncMock()
+        method_hub.call_tool.side_effect = RuntimeError("overview unavailable")
+        service = ReportInputPreparationService(
+            discovery_agent=discovery,
+            method_hub=method_hub,
+            runtime_gateway_client=AsyncMock(),
+        )
+
+        prepared = await service.prepare(
+            query="Create a report",
+            existing_files=existing,
+            discover_workspace_files=True,
+            organization_id="test-org",
+            workspace_id="workspace-b",
+            runtime_gateway={},
+            model="test-model",
+            primary_source_id="source-primary",
+            primary_source_ids=["source-primary"],
+        )
+
+        discovery.discover.assert_awaited_once_with(
+            query="Create a report",
+            organization_id="test-org",
+            workspace_id="workspace-b",
+            model="test-model",
+        )
+        self.assertEqual(prepared.files, existing)
+
     async def test_resolves_document_ids_and_stages_authoritative_metadata(
         self,
     ) -> None:
@@ -371,7 +597,7 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
             ["primary", "related"],
         )
         discovery.discover.assert_awaited_once()
-        method_hub.call_tool.assert_awaited_once()
+        self.assertEqual(method_hub.call_tool.await_count, 2)
         runtime_gateway.stage_report_inputs.assert_awaited_once()
 
     async def test_discovery_failures_use_preparation_error_boundary(self) -> None:
@@ -442,7 +668,7 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(prepared.files, existing)
         self.assertEqual([item.role for item in prepared.selected_inputs], ["primary"])
         self.assertEqual([record.levelno for record in logs.records], [logging.WARNING])
-        method_hub.call_tool.assert_not_awaited()
+        method_hub.call_tool.assert_awaited_once()
         runtime_gateway.stage_report_inputs.assert_not_awaited()
 
     async def test_no_usable_related_artifacts_retains_existing_primary_file(
@@ -492,6 +718,56 @@ class ReportInputPreparationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([item.role for item in prepared.selected_inputs], ["primary"])
         self.assertEqual([record.levelno for record in logs.records], [logging.WARNING])
         runtime_gateway.stage_report_inputs.assert_not_awaited()
+
+    async def test_related_staging_failure_retains_existing_primary_file(self) -> None:
+        existing = [
+            ExecutionFileRequest(
+                artifact_id="attachment-1",
+                filename="primary.pdf",
+                sandbox_path="/workspace/runs/resp-1/inputs/primary.pdf",
+                content_type="application/pdf",
+                size=10,
+                source_id="source-primary",
+                document_id="document-primary",
+                source_object_key="organizations/test-org/sources/primary.pdf",
+            )
+        ]
+        discovery = AsyncMock()
+        discovery.discover.return_value = ["doc-related"]
+        method_hub = AsyncMock()
+        method_hub.call_tool.side_effect = [
+            {"result": {"document": {"contents": []}}},
+            metadata_result("doc-related", source_id="source-related"),
+        ]
+        runtime_gateway = AsyncMock()
+        runtime_gateway.stage_report_inputs.side_effect = RuntimeError(
+            "artifact access denied"
+        )
+        service = ReportInputPreparationService(
+            discovery_agent=discovery,
+            method_hub=method_hub,
+            runtime_gateway_client=runtime_gateway,
+        )
+
+        with self.assertLogs(
+            "app.services.report_input_preparation",
+            level="WARNING",
+        ) as logs:
+            prepared = await service.prepare(
+                query="Create a report",
+                existing_files=existing,
+                discover_workspace_files=True,
+                organization_id="test-org",
+                workspace_id="workspace-b",
+                runtime_gateway={"endpoint": "http://runtime", "token": "secret"},
+                model="test-model",
+                primary_source_id="source-primary",
+            )
+
+        self.assertEqual(prepared.files, existing)
+        self.assertEqual([item.role for item in prepared.selected_inputs], ["primary"])
+        self.assertEqual([record.levelno for record in logs.records], [logging.WARNING])
+        runtime_gateway.stage_report_inputs.assert_awaited_once()
 
     async def test_invalid_staged_payload_uses_preparation_error_boundary(self) -> None:
         discovery = AsyncMock()
