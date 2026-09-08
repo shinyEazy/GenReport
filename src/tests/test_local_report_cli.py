@@ -46,6 +46,9 @@ openai_base_url: https://provider.example/v1
             LOCAL_WORKSPACE_ROOT=self.root / "workspaces",
             LOCAL_EXECUTION_TIMEOUT_SECONDS=10,
             MAX_AGENT_ITERATIONS=3,
+            DEFAULT_MODEL="env-model",
+            OPENAI_API_KEY="",
+            OPENAI_BASE_URL="https://provider.example/v1",
         )
 
     def tearDown(self) -> None:
@@ -96,6 +99,59 @@ openai_base_url: https://provider.example/v1
 
         self.assertEqual(exit_code, 2)
         self.assertIn("LOCAL_MODE=true", stderr.getvalue())
+
+    def test_folder_mode_builds_sorted_non_recursive_config(self) -> None:
+        folder = self.root / "inputs"
+        folder.mkdir()
+        (folder / "z-last.csv").write_text("z\n", encoding="utf-8")
+        (folder / "a-first.csv").write_text("a\n", encoding="utf-8")
+        nested = folder / "nested"
+        nested.mkdir()
+        (nested / "ignored.csv").write_text("ignored\n", encoding="utf-8")
+
+        received = {}
+        test_case = self
+
+        def runner_factory(**kwargs):
+            received["settings"] = kwargs["settings"]
+            received["llm_service"] = kwargs["llm_service"]
+
+            class CapturingRunner:
+                async def run(self, config):
+                    received["config"] = config
+                    return LocalReportResult(
+                        workspace=SimpleNamespace(run_root=test_case.root),
+                        output_text="Report ready.",
+                        artifacts=[],
+                    )
+
+            return CapturingRunner()
+
+        with redirect_stdout(StringIO()):
+            exit_code = main(
+                [
+                    "--folder-path",
+                    str(folder),
+                    "--query",
+                    "Analyze these files",
+                ],
+                runner_factory=runner_factory,
+                settings_value=self.settings,
+                llm_factory=lambda **kwargs: kwargs,
+            )
+
+        self.assertEqual(exit_code, 0)
+        config = received["config"]
+        self.assertEqual(config.query, "Analyze these files")
+        self.assertEqual(
+            [path.name for path in config.files],
+            ["a-first.csv", "z-last.csv"],
+        )
+        self.assertEqual(config.model, "env-model")
+        self.assertEqual(config.openai_api_key, "")
+        self.assertEqual(config.openai_base_url, "https://provider.example/v1")
+        self.assertEqual(config.language, "auto")
+        self.assertIsNone(config.run_id)
 
 
 if __name__ == "__main__":
