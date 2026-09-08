@@ -153,6 +153,87 @@ openai_base_url: https://provider.example/v1
         self.assertEqual(config.language, "auto")
         self.assertIsNone(config.run_id)
 
+    def test_folder_mode_rejects_missing_folder(self) -> None:
+        stderr = StringIO()
+        with redirect_stderr(stderr):
+            exit_code = main(
+                ["--folder-path", str(self.root / "missing"), "--query", "Report"],
+                settings_value=self.settings,
+            )
+
+        self.assertEqual(exit_code, 2)
+        self.assertIn("Input folder is unavailable", stderr.getvalue())
+
+    def test_folder_mode_rejects_file_path(self) -> None:
+        stderr = StringIO()
+        with redirect_stderr(stderr):
+            exit_code = main(
+                ["--folder-path", str(self.source), "--query", "Report"],
+                settings_value=self.settings,
+            )
+
+        self.assertEqual(exit_code, 2)
+        self.assertIn("Input path is not a folder", stderr.getvalue())
+
+    def test_folder_mode_rejects_empty_folder(self) -> None:
+        folder = self.root / "empty"
+        folder.mkdir()
+        stderr = StringIO()
+        with redirect_stderr(stderr):
+            exit_code = main(
+                ["--folder-path", str(folder), "--query", "Report"],
+                settings_value=self.settings,
+            )
+
+        self.assertEqual(exit_code, 2)
+        self.assertIn("Input folder contains no files", stderr.getvalue())
+
+    def test_folder_mode_requires_query(self) -> None:
+        folder = self.root / "inputs"
+        folder.mkdir()
+        (folder / "source.csv").write_text("value\n42\n", encoding="utf-8")
+        stderr = StringIO()
+        with redirect_stderr(stderr):
+            exit_code = main(
+                ["--folder-path", str(folder)],
+                settings_value=self.settings,
+            )
+
+        self.assertEqual(exit_code, 2)
+        self.assertIn("--query is required", stderr.getvalue())
+
+    def test_config_mode_rejects_query(self) -> None:
+        stderr = StringIO()
+        with redirect_stderr(stderr):
+            with self.assertRaises(SystemExit) as raised:
+                main(
+                    ["--config", str(self.config), "--query", "Report"],
+                    settings_value=self.settings,
+                )
+
+        self.assertEqual(raised.exception.code, 2)
+        self.assertIn("--query can only be used", stderr.getvalue())
+
+    def test_parser_rejects_both_input_modes(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            main(
+                [
+                    "--config",
+                    str(self.config),
+                    "--folder-path",
+                    str(self.root),
+                ],
+                settings_value=self.settings,
+            )
+
+        self.assertEqual(raised.exception.code, 2)
+
+    def test_parser_requires_an_input_mode(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            main(["--query", "Report"], settings_value=self.settings)
+
+        self.assertEqual(raised.exception.code, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
