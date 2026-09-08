@@ -112,6 +112,21 @@ Relative entries in `files` resolve from the YAML file's directory. The CLI
 copies them into `data/workspaces/<run_id>/inputs` and writes generated report
 artifacts under `data/workspaces/<run_id>/outputs`.
 
+For a quick local run against every regular file directly inside one folder,
+pass the folder and query without creating YAML:
+
+```bash
+cd src
+PYTHONPATH=. python -m app.local_report \
+  --folder-path ../examples/data/lambda \
+  --query "Analyze all supplied files and create a report"
+```
+
+Folder mode does not scan nested directories. It reads `LOCAL_MODE`,
+`OPENAI_API_KEY`, `OPENAI_BASE_URL`, and the default model from the environment-backed
+settings (`DEFAULT_MODEL` or the first entry in `MODEL_LIST`). Use YAML mode
+when a run needs per-run model or credential overrides.
+
 `model`, `openai_api_key`, and `openai_base_url` are loaded directly from the
 local YAML config for each CLI run. Keep this file out of version control.
 
