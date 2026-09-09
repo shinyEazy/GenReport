@@ -6,6 +6,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from app.local_report import main
 from app.services.local_report_runner import LocalReportResult
@@ -86,6 +87,29 @@ openai_base_url: https://provider.example/v1
                 "base_url": "https://provider.example/v1",
             },
         )
+
+    def test_prints_workspace_relative_to_project_root(self) -> None:
+        stdout = StringIO()
+
+        def runner_factory(**kwargs):
+            runner = FakeRunner()
+            runner.settings = kwargs["settings"]
+            return runner
+
+        with (
+            patch("app.local_report.PROJECT_ROOT", self.root, create=True),
+            redirect_stdout(stdout),
+        ):
+            exit_code = main(
+                ["--config", str(self.config)],
+                runner_factory=runner_factory,
+                settings_value=self.settings,
+                llm_factory=lambda **kwargs: object(),
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Workspace: workspaces/run_1", stdout.getvalue())
+        self.assertIn("- workspaces/run_1/outputs/report.txt", stdout.getvalue())
 
     def test_returns_usage_error_when_local_mode_is_disabled(self) -> None:
         self.settings.LOCAL_MODE = False

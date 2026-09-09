@@ -17,6 +17,9 @@ from app.services.llm_service import LLMService
 from app.services.local_report_runner import LocalReportRunError, LocalReportRunner
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
 def _discover_folder_files(folder_path: Path) -> list[Path]:
     folder = folder_path.expanduser().resolve()
     if not folder.exists():
@@ -51,6 +54,14 @@ def _build_folder_config(
         language="auto",
         run_id=None,
     )
+
+
+def _display_project_path(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return str(resolved)
 
 
 def main(
@@ -103,10 +114,10 @@ def main(
 
     if result.output_text:
         print(result.output_text)
-    print(f"Workspace: {result.workspace.run_root.resolve()}")
+    print(f"Workspace: {_display_project_path(result.workspace.run_root)}")
     print("Artifacts:")
     for artifact in result.artifacts:
-        print(f"- {artifact['artifact_ref']}")
+        print(f"- {_display_project_path(Path(str(artifact['artifact_ref'])))}")
     return 0
 
 
