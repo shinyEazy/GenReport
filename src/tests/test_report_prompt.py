@@ -48,10 +48,7 @@ class ReportPromptTests(unittest.TestCase):
             available_files="AVAILABLE INPUT FILES:\n- input.csv",
         )[0]["content"]
         latex_skill = (
-            Path(__file__).resolve().parents[1]
-            / "app"
-            / "skills"
-            / "latex_skill.md"
+            Path(__file__).resolve().parents[1] / "app" / "skills" / "latex_skill.md"
         ).read_text(encoding="utf-8")
 
         self.assertNotIn("When creating a PDF report", system)

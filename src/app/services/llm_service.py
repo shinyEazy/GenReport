@@ -81,7 +81,7 @@ class LLMService:
                 "stream": True,
             }
             try:
-                stream = await client.chat.completions.create(
+                stream = await self.client.chat.completions.create(
                     **create_kwargs,
                     stream_options={"include_usage": True},
                 )
@@ -89,7 +89,7 @@ class LLMService:
                 message = str(exc)
                 if "stream_options" not in message and "include_usage" not in message:
                     raise
-                stream = await client.chat.completions.create(**create_kwargs)
+                stream = await self.client.chat.completions.create(**create_kwargs)
 
             tool_calls: list[dict[str, Any]] = []
             content = ""
