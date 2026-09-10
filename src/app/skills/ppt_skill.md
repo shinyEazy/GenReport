@@ -35,13 +35,13 @@ Use a clean modern data-presentation layout:
 - Large readable titles and bullets.
 - Three to four insight bullets per slide.
 - Full-size charts with labels and legends preserved.
-- Match the UI language preference: use Vietnamese for `vi`, Chinese for `zh`, and English otherwise.
+- Match the user query language: use Vietnamese for Vietnamese queries and English otherwise.
 
 The standard figure slide should use this structure:
 
 - Top 15%: solid blue title band.
 - Left 62% of body: figure inside a white panel.
-- Right 32% of body: white card titled `Key Finding` or `关键发现`.
+- Right 32% of body: white card titled `Key Finding`.
 - Bottom: subtle footer only.
 
 ## Slide Plan
@@ -88,7 +88,6 @@ COLORS = {
 }
 
 FONT = "Aptos"
-CJK_FONT = "Noto Sans CJK SC"
 
 
 def fill(shape, color):
@@ -153,7 +152,7 @@ def add_header(slide, title):
         size=32,
         bold=True,
         color="white",
-        font=CJK_FONT,
+        font=FONT,
     )
 
 
@@ -206,7 +205,7 @@ def fit_picture(slide, image_path, x, y, w, h):
 def add_cover(title, subtitle):
     slide = blank_slide()
     add_header(slide, title)
-    add_text(slide, subtitle, 0.9, 2.35, 9.2, 0.8, size=22, color="ink", font=CJK_FONT)
+    add_text(slide, subtitle, 0.9, 2.35, 9.2, 0.8, size=22, color="ink", font=FONT)
     accent = slide.shapes.add_shape(
         MSO_SHAPE.RECTANGLE, Inches(0.9), Inches(3.35), Inches(2.8), Inches(0.08)
     )
@@ -232,7 +231,7 @@ def add_summary_slide(title, bullets, page):
     add_panel(slide, 0.8, 1.65, 11.75, 4.8)
     y = 2.05
     for bullet in bullets[:5]:
-        add_bullet(slide, bullet, 1.25, y, 10.8, 0.62, size=22, font=CJK_FONT)
+        add_bullet(slide, bullet, 1.25, y, 10.8, 0.62, size=22, font=FONT)
         y += 0.78
     add_footer(slide, page)
     return slide
@@ -254,11 +253,11 @@ def add_figure_slide(title, image_path, bullets, page, heading="Key Finding"):
         size=23,
         bold=True,
         color="blue",
-        font=CJK_FONT,
+        font=FONT,
     )
     y = 2.72
     for bullet in bullets[:4]:
-        add_bullet(slide, bullet, 9.08, y, 3.15, 0.72, size=19, font=CJK_FONT)
+        add_bullet(slide, bullet, 9.08, y, 3.15, 0.72, size=19, font=FONT)
         y += 0.82
     add_footer(slide, page)
     return slide

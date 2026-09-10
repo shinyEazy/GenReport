@@ -228,7 +228,6 @@ class LocalReportRunner:
             {
                 "role": "system",
                 "content": render_system_prompt(
-                    language=local_config.language,
                     input_path=workspace.virtual_inputs_path,
                     work_path=workspace.virtual_work_path,
                     output_path=workspace.virtual_outputs_path,

@@ -95,9 +95,6 @@ class AxiomToolExecutor:
         lines = ["AVAILABLE INPUT FILES:"]
         for item in self.files:
             lines.append(f"  - {item.filename}: {item.sandbox_path}")
-        lines.append(
-            "Inputs are read-only. Save every generated file under the output workspace."
-        )
         return "\n".join(lines)
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:

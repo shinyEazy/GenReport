@@ -51,6 +51,17 @@ class ReportPromptTests(unittest.TestCase):
         self.assertIn("References", system)
         self.assertIn("AVAILABLE INPUT FILES order", system)
 
+    def test_requires_evidence_bound_and_proportional_reporting(self):
+        system = build_report_messages(
+            self.request,
+            available_files="AVAILABLE INPUT FILES:\n- input.csv",
+        )[0]["content"]
+
+        self.assertIn("directly supported by the supplied input files", system)
+        self.assertIn("Do not use general domain knowledge", system)
+        self.assertIn("Insufficient evidence", system)
+        self.assertIn("proportional to the available evidence", system)
+
     def test_attaches_images_after_the_text_instruction(self):
         image_part = {
             "type": "image_url",
