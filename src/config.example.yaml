@@ -1,0 +1,8 @@
+query: Analyze this dataset, identify the main patterns, create visualizations, and write a report with the most important findings in .pdf.
+
+files:
+  - ../examples/data/lambda/hk_air_quality_dataset.csv
+
+model: qwen/qwen3.7-flash
+openai_api_key:
+openai_base_url:
