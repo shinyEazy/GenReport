@@ -98,3 +98,4 @@ src/*.tex
 
 config.yaml
 docs/superpowers/
+examples/data/
