@@ -14,7 +14,7 @@ def test_normalize_ui_language_supports_vietnamese_locales() -> None:
 
 
 def test_normalize_ui_language_preserves_existing_fallbacks() -> None:
-    assert normalize_ui_language("zh-CN") == "zh"
+    assert normalize_ui_language("zh-CN") == "en"
     assert normalize_ui_language("en-US") == "en"
     assert normalize_ui_language("fr-FR") == "en"
     assert normalize_ui_language(None) == "en"

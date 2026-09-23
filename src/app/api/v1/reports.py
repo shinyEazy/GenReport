@@ -45,6 +45,7 @@ def _build_report_service(
     from app.services.axiom_execution_client import AxiomExecutionClient
     from app.services.axiom_tool_executor import AxiomToolExecutor
     from app.services.llm_service import LLMService
+    from app.services.axiom_model_service import AxiomModelService
     from app.services.report_dashboard_extraction import (
         build_dashboard_extraction_service,
     )
@@ -52,10 +53,35 @@ def _build_report_service(
     from app.services.runtime_gateway_client import RuntimeGatewayClient
 
     runtime_gateway_client = RuntimeGatewayClient()
+    model_service_configured = bool(
+        settings.MODEL_SERVICE_URL or settings.MODEL_SERVICE_TOKEN
+    )
+    if model_service_configured and not (
+        settings.MODEL_SERVICE_URL and settings.MODEL_SERVICE_TOKEN
+    ):
+        raise RuntimeError(
+            "MODEL_SERVICE_URL and MODEL_SERVICE_TOKEN must be configured together."
+        )
+    model_service = (
+        AxiomModelService(
+            base_url=settings.MODEL_SERVICE_URL,
+            token=settings.MODEL_SERVICE_TOKEN,
+            organization_id=report_request.organization_id,
+            workspace_id=report_request.workspace_id,
+            run_id=report_request.run_id,
+            trace_id=report_request.trace_id,
+            profile_mode=True,
+        )
+        if settings.MODEL_SERVICE_URL and settings.MODEL_SERVICE_TOKEN
+        else None
+    )
     input_preparer = None
     if not dashboard_extraction:
         from app.services.method_hub_client import MethodHubClient
-        from app.services.report_file_discovery import DiscoveryAgent
+        from app.services.report_file_discovery import (
+            AxiomDiscoveryAgent,
+            DiscoveryAgent,
+        )
         from app.services.report_input_preparation import ReportInputPreparationService
 
         method_hub = MethodHubClient(
@@ -64,14 +90,22 @@ def _build_report_service(
             trace_id=request.headers.get("x-trace-id"),
             organization_id=report_request.organization_id,
         )
-        discovery_agent = DiscoveryAgent(
-            method_hub=method_hub,
-            api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_BASE_URL,
-            default_model=settings.DEFAULT_MODEL,
-            max_artifacts=settings.REPORT_DISCOVERY_MAX_ARTIFACTS,
-            max_rounds=settings.REPORT_DISCOVERY_MAX_ROUNDS,
-        )
+        if model_service is not None:
+            discovery_agent = AxiomDiscoveryAgent(
+                method_hub=method_hub,
+                model_service=model_service,
+                max_artifacts=settings.REPORT_DISCOVERY_MAX_ARTIFACTS,
+                max_rounds=settings.REPORT_DISCOVERY_MAX_ROUNDS,
+            )
+        else:
+            discovery_agent = DiscoveryAgent(
+                method_hub=method_hub,
+                api_key=settings.OPENAI_API_KEY,
+                base_url=settings.OPENAI_BASE_URL,
+                default_model=settings.DEFAULT_MODEL,
+                max_artifacts=settings.REPORT_DISCOVERY_MAX_ARTIFACTS,
+                max_rounds=settings.REPORT_DISCOVERY_MAX_ROUNDS,
+            )
         input_preparer = ReportInputPreparationService(
             discovery_agent=discovery_agent,
             method_hub=method_hub,
@@ -89,9 +123,11 @@ def _build_report_service(
             multimodal_image_max_bytes=settings.MULTIMODAL_IMAGE_MAX_BYTES,
         )
 
+    llm_service = model_service or LLMService()
+
     if dashboard_extraction:
         return build_dashboard_extraction_service(
-            llm_service=LLMService(),
+            llm_service=llm_service,
             executor_factory=executor_factory,
             event_factory_builder=ReportEventFactory,
             max_iterations=settings.MAX_AGENT_ITERATIONS,
@@ -103,7 +139,7 @@ def _build_report_service(
 
     assert input_preparer is not None
     return ReportExecutionService(
-        llm_service=LLMService(),
+        llm_service=llm_service,
         input_preparer=input_preparer,
         executor_factory=executor_factory,
         event_factory_builder=ReportEventFactory,

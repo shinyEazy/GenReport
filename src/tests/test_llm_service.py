@@ -31,6 +31,50 @@ class LLMServiceCompatibilityTests(unittest.IsolatedAsyncioTestCase):
                 )
             )
 
+    async def test_chat_preserves_configured_model_identifier(self) -> None:
+        service = object.__new__(LLMService)
+        completion = AsyncMock(
+            return_value=SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="ready"))]
+            )
+        )
+        service.client = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=completion))
+        )
+        service.default_model = "default-model"
+
+        await service.chat(
+            [{"role": "user", "content": "Create a report"}],
+            model="deepseek/deepseek-v4-pro",
+        )
+
+        self.assertEqual(
+            completion.await_args.kwargs["model"], "deepseek/deepseek-v4-pro"
+        )
+
+    async def test_stream_chat_uses_the_service_client(self) -> None:
+        service = object.__new__(LLMService)
+
+        async def stream_chunks():
+            yield SimpleNamespace(usage=None, choices=[])
+
+        completion = AsyncMock(return_value=stream_chunks())
+        service.client = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=completion))
+        )
+        service.default_model = "test-model"
+
+        events = [
+            event
+            async for event in service.stream_chat(
+                [{"role": "user", "content": "Create a report"}],
+                tool_definitions=[],
+            )
+        ]
+
+        self.assertEqual(events[-1]["type"], "done")
+        completion.assert_awaited_once()
+
     async def test_chat_uses_async_openai_completion_contract(self) -> None:
         service = object.__new__(LLMService)
         completion = AsyncMock(

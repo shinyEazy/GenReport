@@ -6,6 +6,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_PATH = ROOT / "docker" / "docker-compose.yaml"
+DOCKERFILE_PATH = ROOT / "docker" / "Dockerfile"
 
 
 class DeploymentConfigTests(unittest.TestCase):
@@ -36,11 +37,14 @@ class DeploymentConfigTests(unittest.TestCase):
         self.assertIn("LOCAL_MODE", env_example)
         self.assertIn("LOCAL_WORKSPACE_ROOT", env_example)
 
-    def test_compose_installs_file_utility_for_local_report_tools(self):
+    def test_image_build_installs_file_utility_for_local_report_tools(self):
         compose = yaml.safe_load(COMPOSE_PATH.read_text(encoding="utf-8"))
-        command = " ".join(compose["services"]["api"]["command"])
+        api = compose["services"]["api"]
+        dockerfile = DOCKERFILE_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("apt-get install -y --no-install-recommends file", command)
+        self.assertEqual(api["build"]["dockerfile"], "docker/Dockerfile")
+        self.assertIn("apt-get install --yes --no-install-recommends file", dockerfile)
+        self.assertNotIn("apt-get", " ".join(api["command"]))
 
 
 if __name__ == "__main__":

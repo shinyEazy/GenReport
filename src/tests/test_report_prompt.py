@@ -1,5 +1,6 @@
 import json
 import unittest
+from pathlib import Path
 
 from app.contracts.report_execution import ReportExecutionRequest
 from app.services.report_prompt import build_report_messages
@@ -41,15 +42,30 @@ class ReportPromptTests(unittest.TestCase):
         )
         self.assertIn("PyMuPDF (fitz)", serialized)
 
-    def test_requires_inline_citations_and_references_for_input_backed_reports(self):
+    def test_delegates_pdf_citations_to_the_latex_skill(self):
+        system = build_report_messages(
+            self.request,
+            available_files="AVAILABLE INPUT FILES:\n- input.csv",
+        )[0]["content"]
+        latex_skill = (
+            Path(__file__).resolve().parents[1] / "app" / "skills" / "latex_skill.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("When creating a PDF report", system)
+        self.assertIn("include an inline citation", latex_skill)
+        self.assertIn("References", latex_skill)
+        self.assertIn("AVAILABLE INPUT FILES", latex_skill)
+
+    def test_requires_evidence_bound_and_proportional_reporting(self):
         system = build_report_messages(
             self.request,
             available_files="AVAILABLE INPUT FILES:\n- input.csv",
         )[0]["content"]
 
-        self.assertIn("[n] or [n, m]", system)
-        self.assertIn("References", system)
-        self.assertIn("AVAILABLE INPUT FILES order", system)
+        self.assertIn("directly supported by the supplied input files", system)
+        self.assertIn("Do not use general domain knowledge", system)
+        self.assertIn("Insufficient evidence", system)
+        self.assertIn("proportional to the available evidence", system)
 
     def test_attaches_images_after_the_text_instruction(self):
         image_part = {

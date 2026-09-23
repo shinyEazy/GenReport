@@ -51,7 +51,6 @@ def build_dashboard_extraction_messages(
 
 {
         render_system_prompt(
-            language=request.language,
             input_path=request.execution_context.input_path,
             work_path=request.execution_context.work_path,
             output_path=request.execution_context.output_path,

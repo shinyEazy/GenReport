@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     )
 
     OPENAI_API_KEY: str = ""
+    MODEL_SERVICE_URL: str = ""
+    MODEL_SERVICE_TOKEN: str = ""
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     DEFAULT_MODEL: str = Field(
         default="",

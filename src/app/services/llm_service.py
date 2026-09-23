@@ -22,16 +22,6 @@ class LLMService:
         self.default_model = settings.DEFAULT_MODEL
 
     @staticmethod
-    def _normalize_model(model: str) -> str:
-        if model in {"deepseek/deepseek-v4-pro", "deepseek-v4-pro"}:
-            return "deepseek-v4-pro"
-        return model
-
-    def _client_for_model(self, model: str):
-        normalized_model = self._normalize_model(model)
-        return self.client, normalized_model
-
-    @staticmethod
     def _get_delta_extra_text(delta: Any, *field_names: str) -> str:
         for field_name in field_names:
             value = getattr(delta, field_name, None)
@@ -82,17 +72,16 @@ class LLMService:
         if tool_definitions is None:
             raise ValueError("tool_definitions are required for report execution")
         try:
-            selected_model = self._normalize_model(model or self.default_model)
-            client, provider_model = self._client_for_model(selected_model)
+            selected_model = model or self.default_model
             create_kwargs = {
-                "model": provider_model,
+                "model": selected_model,
                 "messages": messages,
                 "tools": tool_definitions,
                 "tool_choice": tool_choice,
                 "stream": True,
             }
             try:
-                stream = await client.chat.completions.create(
+                stream = await self.client.chat.completions.create(
                     **create_kwargs,
                     stream_options={"include_usage": True},
                 )
@@ -100,7 +89,7 @@ class LLMService:
                 message = str(exc)
                 if "stream_options" not in message and "include_usage" not in message:
                     raise
-                stream = await client.chat.completions.create(**create_kwargs)
+                stream = await self.client.chat.completions.create(**create_kwargs)
 
             tool_calls: list[dict[str, Any]] = []
             content = ""
@@ -184,10 +173,9 @@ class LLMService:
         max_tokens: int = 4096,
     ) -> str:
         try:
-            selected_model = self._normalize_model(model or self.default_model)
-            client, provider_model = self._client_for_model(selected_model)
-            response = await client.chat.completions.create(
-                model=provider_model,
+            selected_model = model or self.default_model
+            response = await self.client.chat.completions.create(
+                model=selected_model,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,

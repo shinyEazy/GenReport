@@ -32,7 +32,10 @@ def trace_operation(
         run_type=run_type,
         project_name=os.getenv("LANGCHAIN_PROJECT") or "gen-report",
         tags=list(tags or ()),
-        process_inputs=_normalize_mapping,
+        reduce_fn=_reduce_llm_stream if run_type == "llm" else None,
+        process_inputs=(
+            _normalize_llm_inputs if run_type == "llm" else _normalize_mapping
+        ),
         process_outputs=_normalize_payload,
     )(function)
 
@@ -47,6 +50,48 @@ def _normalize_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
         for key, item in value.items()
         if key != "self"
     }
+
+
+def _normalize_llm_inputs(value: Mapping[str, Any]) -> dict[str, Any]:
+    normalized = _normalize_mapping(value)
+    tools = normalized.pop("tool_definitions", None)
+    if not isinstance(tools, list):
+        return normalized
+
+    normalized["tools"] = tools
+    normalized["bound_tools"] = [
+        str(function["name"])
+        for tool in tools
+        if isinstance(tool, Mapping)
+        and isinstance(function := tool.get("function"), Mapping)
+        and function.get("name")
+    ]
+    return normalized
+
+
+def _reduce_llm_stream(chunks: list[Any]) -> Any:
+    final_chunk = next(
+        (
+            chunk
+            for chunk in reversed(chunks)
+            if isinstance(chunk, Mapping) and chunk.get("type") == "done"
+        ),
+        None,
+    )
+    if isinstance(final_chunk, Mapping):
+        content = str(final_chunk.get("content") or "")
+        if content:
+            return content
+        tool_calls = final_chunk.get("tool_calls")
+        if tool_calls:
+            return {"tool_calls": tool_calls}
+
+    content = "".join(
+        str(chunk.get("content") or "")
+        for chunk in chunks
+        if isinstance(chunk, Mapping) and chunk.get("type") == "delta"
+    )
+    return content
 
 
 def _normalize_payload(value: Any) -> Any:

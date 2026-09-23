@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from app.services.method_hub_client import MethodHubClient
 from app.services.report_tracing import trace_operation
+from app.services.axiom_model_service import AxiomModelService
 
 
 REPORT_RETRIEVAL_TOOL_NAMES = {
@@ -246,6 +247,144 @@ class DiscoveryAgent:
         )
 
 
+class AxiomDiscoveryAgent:
+    """Run source discovery through the org-scoped Model Service task."""
+
+    def __init__(
+        self,
+        *,
+        method_hub: MethodHubClient,
+        model_service: AxiomModelService,
+        max_artifacts: int = 100,
+        max_rounds: int = 100,
+    ) -> None:
+        self.method_hub = method_hub
+        self.model_service = model_service
+        self.max_artifacts = max_artifacts
+        self.max_rounds = min(max_rounds, MAX_REPORT_RETRIEVAL_TOOL_CALLS + 2)
+
+    async def discover(
+        self,
+        *,
+        query: str,
+        organization_id: str,
+        workspace_id: str,
+        model: str | None = None,
+    ) -> list[str]:
+        tools = await self.method_hub.create_langchain_tools(
+            allowed_names=REPORT_RETRIEVAL_TOOL_NAMES,
+            organization_id=organization_id,
+            workspace_id=workspace_id,
+        )
+        if not tools:
+            raise RuntimeError("Method Hub has no report retrieval tools available")
+        definitions = [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.args,
+                },
+            }
+            for tool in tools
+        ]
+        by_name = {tool.name: tool for tool in tools}
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": _system_prompt(workspace_id)},
+            {"role": "user", "content": query},
+        ]
+        retrieval_calls = 0
+        for _ in range(self.max_rounds):
+            content = ""
+            tool_calls: list[dict[str, Any]] = []
+            async for event in self.model_service.stream_chat(
+                messages,
+                model=model,
+                tool_definitions=definitions,
+                task_id="report.discover_sources",
+                response_format={"type": "json_object"},
+            ):
+                if event.get("type") == "delta":
+                    content += str(event.get("content") or "")
+                elif event.get("type") == "tool_call":
+                    value = event.get("tool_call")
+                    if isinstance(value, dict):
+                        tool_calls.append(value)
+                elif event.get("type") == "done":
+                    done_calls = event.get("tool_calls")
+                    if isinstance(done_calls, list):
+                        tool_calls = [
+                            item for item in done_calls if isinstance(item, dict)
+                        ]
+                elif event.get("type") == "error":
+                    raise RuntimeError(
+                        str(event.get("content") or "Model Service discovery failed")
+                    )
+
+            if not tool_calls:
+                return _parse_discovery_selection(content, limit=self.max_artifacts)
+
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": content or None,
+                    "tool_calls": tool_calls,
+                }
+            )
+            for call in tool_calls:
+                name = str(call.get("function", {}).get("name") or "")
+                tool = by_name.get(name)
+                if tool is None:
+                    raise RuntimeError(f"Discovery requested unavailable tool: {name}")
+                retrieval_calls += 1
+                if retrieval_calls > MAX_REPORT_RETRIEVAL_TOOL_CALLS:
+                    raise RuntimeError(
+                        "Report discovery exceeded its retrieval call limit"
+                    )
+                raw_arguments = call.get("function", {}).get("arguments") or "{}"
+                try:
+                    arguments = json.loads(raw_arguments)
+                    if not isinstance(arguments, dict):
+                        raise ValueError("tool arguments must be an object")
+                    result = await tool.ainvoke(arguments)
+                    result_content = json.dumps(result, ensure_ascii=False, default=str)
+                except Exception as exc:
+                    result_content = json.dumps(
+                        {
+                            "success": False,
+                            "error_type": type(exc).__name__,
+                            "error": str(exc),
+                            "instruction": "Use another retrieval tool or correct the arguments.",
+                        },
+                        ensure_ascii=False,
+                    )
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": str(
+                            call.get("id") or call.get("call_id") or "tool"
+                        ),
+                        "content": result_content,
+                    }
+                )
+        raise RuntimeError("Report discovery exceeded its model round limit")
+
+
+def _parse_discovery_selection(content: str, *, limit: int) -> list[str]:
+    text = content.strip()
+    if text.startswith("```"):
+        text = text.strip("`").removeprefix("json").strip()
+    try:
+        payload = json.loads(text)
+        selection = ReportArtifactSelection.model_validate(payload)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise RuntimeError(
+            "Report file discovery returned invalid JSON selection"
+        ) from exc
+    return _deduplicate_document_ids(selection.document_ids, limit=limit)
+
+
 def _is_openrouter_url(base_url: str) -> bool:
     hostname = (urlparse(base_url).hostname or "").lower()
     return hostname == "openrouter.ai" or hostname.endswith(".openrouter.ai")
@@ -322,4 +461,4 @@ def _register_minimal_profile(model: Any) -> None:
     )
 
 
-__all__ = ["DiscoveryAgent", "ReportArtifactSelection"]
+__all__ = ["AxiomDiscoveryAgent", "DiscoveryAgent", "ReportArtifactSelection"]

@@ -7,49 +7,32 @@ from app.contracts.report_execution import ReportExecutionRequest
 
 def render_system_prompt(
     *,
-    language: str,
     input_path: str,
     work_path: str,
     output_path: str,
     available_files: str,
 ) -> str:
-    return f"""You are the GenReport internal report engine.
+    return f"""You are an AI agent developed by AXIOM, responsible for generating reports from data.
 
-Requested language: {language}
-Read-only inputs: {input_path}
-Working files and skills: {work_path}
-Authoritative generated outputs: {output_path}
+Generate the report in the same language as the current user instruction, unless the instruction explicitly requests another language.
+
+Read-only inputs: {input_path}/
+Working files and skills: {work_path}/
+Authoritative generated outputs: {output_path}/
+
 
 {available_files}
 
-Use only the supplied AXIOM sandbox tools. Each tool call is isolated, so reload
-variables and files on every call. Runtime package installation is prohibited;
-use only preinstalled packages. Never write outside {output_path}. Treat input
-files as read-only. Runtime Gateway artifact finalization is authoritative: only
-files finalized there may be presented as report artifacts.
+Use only the supplied AXIOM sandbox tools. Each tool call is isolated, so reload variables and files on every call. Runtime package installation is prohibited; use only preinstalled packages. Never write outside {output_path}/. Treat input files as read-only. Runtime Gateway artifact finalization is authoritative: only files finalized there may be presented as report artifacts.
 
-When image inputs are attached, inspect the attached images directly. Never
-pixel-analyze an image, use OCR on an image, or install packages to analyze an
-image. Use your direct visual observations to create the required PDF report.
+When image inputs are attached, inspect the attached images directly. Never pixel-analyze an image, use OCR on an image, or install packages to analyze an image. Use your direct visual observations to create the required PDF report.
 
-For a formal report, read the exact skill file
-{work_path}/.skills/latex_skill.md. For slides, read
-{work_path}/.skills/ppt_skill.md. Do not call read_file on the .skills
-directory itself; use an individual skill file.
+For a formal report, read the exact skill file {work_path}/.skills/latex_skill.md. For slides, read {work_path}/.skills/ppt_skill.md. Do not call read_file on the .skills directory itself; use an individual skill file.
 
-For PDF inputs, use preinstalled PyMuPDF (fitz) from Python instead of shelling
-out to pdftotext or other optional system binaries.
+For PDF inputs, use preinstalled PyMuPDF (fitz) from Python instead of shelling out to pdftotext or other optional system binaries.
 
-When creating a PDF report from supplied input files, include inline citations
-for every substantive fact, statistic, comparison, or conclusion. Number sources
-in the AVAILABLE INPUT FILES order and cite them as [n] or [n, m]. End the PDF
-with a References heading that lists every supplied input file using the same
-numbers, for example:
-
-[1] sales.csv
-[2] notes.pdf
-
-Do not invent citations for sources that were not supplied.""".strip()
+Ground the report exclusively in the supplied input files. Every substantive fact, comparison, and conclusion must be directly supported by the supplied input files. Do not use general domain knowledge, speculate, fill gaps, or broaden the report beyond the user instruction and supplied evidence. When evidence is absent, weak, ambiguous, incomplete, or conflicting, state "Insufficient evidence" and explain the limitation without guessing. Keep the scope and length proportional to the available evidence; do not add a lengthy narrative when the inputs support only a narrow finding.
+""".strip()
 
 
 def build_report_messages(
@@ -62,7 +45,6 @@ def build_report_messages(
         {
             "role": "system",
             "content": render_system_prompt(
-                language=request.language,
                 input_path=request.execution_context.input_path,
                 work_path=request.execution_context.work_path,
                 output_path=request.execution_context.output_path,

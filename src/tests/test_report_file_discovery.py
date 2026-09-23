@@ -5,6 +5,7 @@ from unittest.mock import patch
 from langchain_core.messages import ToolMessage
 
 from app.services.report_file_discovery import (
+    AxiomDiscoveryAgent,
     DiscoveryAgent,
     ReportArtifactSelection,
     _recover_tool_errors,
@@ -32,7 +33,78 @@ class FakeMethodHub:
         return self.tools
 
 
+class FakeDiscoveryTool:
+    name = "corpus_bm25_search"
+    description = "Search corpus"
+    args = {"type": "object", "properties": {"query": {"type": "string"}}}
+
+    async def ainvoke(self, arguments):
+        return {"results": [{"document_id": "doc-1"}], "arguments": arguments}
+
+
+class FakeAxiomDiscoveryModel:
+    def __init__(self) -> None:
+        self.calls = []
+
+    async def stream_chat(self, messages, **kwargs):
+        self.calls.append((messages, kwargs))
+        if len(self.calls) == 1:
+            yield {
+                "type": "tool_call",
+                "tool_call": {
+                    "id": "call-1",
+                    "type": "function",
+                    "function": {
+                        "name": "corpus_bm25_search",
+                        "arguments": '{"query":"revenue"}',
+                    },
+                },
+            }
+            yield {
+                "type": "done",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {
+                            "name": "corpus_bm25_search",
+                            "arguments": '{"query":"revenue"}',
+                        },
+                    }
+                ],
+            }
+            return
+        yield {"type": "delta", "content": '{"document_ids":["doc-1","doc-1"]}'}
+        yield {"type": "done", "content": "", "tool_calls": []}
+
+
 class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
+    async def test_axiom_discovery_resolves_task_and_executes_retrieval_tool(
+        self,
+    ) -> None:
+        model = FakeAxiomDiscoveryModel()
+        agent = AxiomDiscoveryAgent(
+            method_hub=FakeMethodHub(tools=[FakeDiscoveryTool()]),
+            model_service=model,
+            max_artifacts=5,
+        )
+
+        selected = await agent.discover(
+            query="Find revenue evidence",
+            organization_id="org-1",
+            workspace_id="workspace-1",
+        )
+
+        self.assertEqual(selected, ["doc-1"])
+        self.assertEqual(len(model.calls), 2)
+        self.assertEqual(model.calls[0][1]["task_id"], "report.discover_sources")
+        self.assertEqual(model.calls[0][1]["response_format"], {"type": "json_object"})
+        self.assertEqual(
+            model.calls[0][1]["tool_definitions"][0]["function"]["name"],
+            "corpus_bm25_search",
+        )
+
     def test_openrouter_discovery_model_disables_reasoning(self) -> None:
         with patch("langchain_openai.ChatOpenAI") as chat_openai:
             agent = DiscoveryAgent(
