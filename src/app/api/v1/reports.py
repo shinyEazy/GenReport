@@ -78,7 +78,10 @@ def _build_report_service(
     input_preparer = None
     if not dashboard_extraction:
         from app.services.method_hub_client import MethodHubClient
-        from app.services.report_file_discovery import AxiomDiscoveryAgent, DiscoveryAgent
+        from app.services.report_file_discovery import (
+            AxiomDiscoveryAgent,
+            DiscoveryAgent,
+        )
         from app.services.report_input_preparation import ReportInputPreparationService
 
         method_hub = MethodHubClient(

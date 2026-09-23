@@ -314,9 +314,13 @@ class AxiomDiscoveryAgent:
                 elif event.get("type") == "done":
                     done_calls = event.get("tool_calls")
                     if isinstance(done_calls, list):
-                        tool_calls = [item for item in done_calls if isinstance(item, dict)]
+                        tool_calls = [
+                            item for item in done_calls if isinstance(item, dict)
+                        ]
                 elif event.get("type") == "error":
-                    raise RuntimeError(str(event.get("content") or "Model Service discovery failed"))
+                    raise RuntimeError(
+                        str(event.get("content") or "Model Service discovery failed")
+                    )
 
             if not tool_calls:
                 return _parse_discovery_selection(content, limit=self.max_artifacts)
@@ -335,7 +339,9 @@ class AxiomDiscoveryAgent:
                     raise RuntimeError(f"Discovery requested unavailable tool: {name}")
                 retrieval_calls += 1
                 if retrieval_calls > MAX_REPORT_RETRIEVAL_TOOL_CALLS:
-                    raise RuntimeError("Report discovery exceeded its retrieval call limit")
+                    raise RuntimeError(
+                        "Report discovery exceeded its retrieval call limit"
+                    )
                 raw_arguments = call.get("function", {}).get("arguments") or "{}"
                 try:
                     arguments = json.loads(raw_arguments)
@@ -356,7 +362,9 @@ class AxiomDiscoveryAgent:
                 messages.append(
                     {
                         "role": "tool",
-                        "tool_call_id": str(call.get("id") or call.get("call_id") or "tool"),
+                        "tool_call_id": str(
+                            call.get("id") or call.get("call_id") or "tool"
+                        ),
                         "content": result_content,
                     }
                 )
@@ -371,7 +379,9 @@ def _parse_discovery_selection(content: str, *, limit: int) -> list[str]:
         payload = json.loads(text)
         selection = ReportArtifactSelection.model_validate(payload)
     except (json.JSONDecodeError, ValueError) as exc:
-        raise RuntimeError("Report file discovery returned invalid JSON selection") from exc
+        raise RuntimeError(
+            "Report file discovery returned invalid JSON selection"
+        ) from exc
     return _deduplicate_document_ids(selection.document_ids, limit=limit)
 
 

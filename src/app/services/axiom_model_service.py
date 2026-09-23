@@ -3,6 +3,7 @@
 This stays local because GenReport is deployed from an independent checkout. It
 never receives provider credentials and has no direct-provider fallback.
 """
+
 from __future__ import annotations
 
 import json
@@ -15,16 +16,26 @@ import httpx
 class AxiomModelService:
     default_model = "report.generate"
 
-    def __init__(self, *, base_url: str, token: str, organization_id: str,
-                 workspace_id: str, run_id: str, trace_id: str | None = None,
-                 http: httpx.AsyncClient | None = None,
-                 profile_mode: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        token: str,
+        organization_id: str,
+        workspace_id: str,
+        run_id: str,
+        trace_id: str | None = None,
+        http: httpx.AsyncClient | None = None,
+        profile_mode: bool = False,
+    ) -> None:
         if not base_url or not token:
             raise ValueError("AXIOM Model Service URL and service token are required")
         self._base_url = base_url.rstrip("/")
         self._headers = {
-            "Authorization": f"Bearer {token}", "X-Org-ID": organization_id,
-            "X-Workspace-ID": workspace_id, "X-Consumer-Service": "genreport",
+            "Authorization": f"Bearer {token}",
+            "X-Org-ID": organization_id,
+            "X-Workspace-ID": workspace_id,
+            "X-Consumer-Service": "genreport",
             "X-Run-ID": run_id,
         }
         if trace_id:
@@ -50,39 +61,62 @@ class AxiomModelService:
                     "roles": ["llm"],
                     "run_id": self._run_id,
                     "workspace_id": self._headers.get("X-Workspace-ID"),
-                    **({"config_revision": self._revision} if self._revision is not None else {}),
+                    **(
+                        {"config_revision": self._revision}
+                        if self._revision is not None
+                        else {}
+                    ),
                 },
                 headers=self._headers,
             )
-            if profile_response.is_success and not profile_response.headers.get("content-type", "").startswith("text/event-stream"):
+            if profile_response.is_success and not profile_response.headers.get(
+                "content-type", ""
+            ).startswith("text/event-stream"):
                 data = self._checked_json(profile_response)
                 resolutions = data.get("resolutions")
                 if not isinstance(resolutions, list) or not resolutions:
-                    raise RuntimeError("Model Service returned an invalid consumer profile resolution")
+                    raise RuntimeError(
+                        "Model Service returned an invalid consumer profile resolution"
+                    )
                 resolution = resolutions[0]
-                if not isinstance(resolution, dict) or not isinstance(resolution.get("resolution_id"), str):
-                    raise RuntimeError("Model Service returned an invalid consumer profile resolution")
+                if not isinstance(resolution, dict) or not isinstance(
+                    resolution.get("resolution_id"), str
+                ):
+                    raise RuntimeError(
+                        "Model Service returned an invalid consumer profile resolution"
+                    )
                 revision = data.get("config_revision")
                 if not isinstance(revision, int):
-                    raise RuntimeError("Model Service returned an invalid config revision")
+                    raise RuntimeError(
+                        "Model Service returned an invalid config revision"
+                    )
                 self._revision = revision
                 self._resolutions[task_id] = resolution["resolution_id"]
                 model_id = resolution.get("model_id")
                 if isinstance(model_id, str) and model_id:
                     self.default_model = model_id
                 return resolution["resolution_id"]
-            if profile_response.status_code not in {404, 405} and profile_response.headers.get("content-type", "").startswith("application/json"):
+            if profile_response.status_code not in {
+                404,
+                405,
+            } and profile_response.headers.get("content-type", "").startswith(
+                "application/json"
+            ):
                 self._checked_json(profile_response)
         body: dict[str, Any] = {"run_id": self._run_id, "task_ids": [task_id]}
         if self._revision is not None:
             body["config_revision"] = self._revision
-        response = await client.post(f"{self._base_url}/task-resolutions", json=body, headers=self._headers)
+        response = await client.post(
+            f"{self._base_url}/task-resolutions", json=body, headers=self._headers
+        )
         data = self._checked_json(response)
         resolutions = data.get("resolutions")
         if not isinstance(resolutions, list) or len(resolutions) != 1:
             raise RuntimeError("Model Service returned an invalid task resolution")
         resolution = resolutions[0]
-        if not isinstance(resolution, dict) or not isinstance(resolution.get("resolution_id"), str):
+        if not isinstance(resolution, dict) or not isinstance(
+            resolution.get("resolution_id"), str
+        ):
             raise RuntimeError("Model Service returned an invalid task resolution")
         revision = data.get("config_revision")
         if not isinstance(revision, int):
@@ -113,11 +147,16 @@ class AxiomModelService:
             pass
         raise RuntimeError(f"Model Service request failed ({code})")
 
-    async def stream_chat(self, messages: list[dict[str, Any]], model: str | None = None,
-                          tool_definitions: list[dict[str, Any]] | None = None,
-                          tool_choice: str | dict[str, Any] = "auto",
-                          *, task_id: str = "report.generate",
-                          response_format: dict[str, Any] | None = None) -> AsyncGenerator[dict[str, Any], None]:
+    async def stream_chat(
+        self,
+        messages: list[dict[str, Any]],
+        model: str | None = None,
+        tool_definitions: list[dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] = "auto",
+        *,
+        task_id: str = "report.generate",
+        response_format: dict[str, Any] | None = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
         if tool_definitions is None:
             raise ValueError("tool_definitions are required for report execution")
         owns_client = self._http is None
@@ -145,12 +184,18 @@ class AxiomModelService:
                 }
             if response_format is not None:
                 body["response_format"] = response_format
-            async with client.stream("POST", f"{self._base_url}/inference/responses", json=body,
-                                     headers=self._headers) as response:
+            async with client.stream(
+                "POST",
+                f"{self._base_url}/inference/responses",
+                json=body,
+                headers=self._headers,
+            ) as response:
                 if not response.is_success:
                     await response.aread()
                     self._checked_json(response)
-                if not response.headers.get("content-type", "").startswith("text/event-stream"):
+                if not response.headers.get("content-type", "").startswith(
+                    "text/event-stream"
+                ):
                     raise RuntimeError("Model Service did not return an event stream")
                 event_type = ""
                 async for line in response.aiter_lines():
@@ -158,24 +203,44 @@ class AxiomModelService:
                         event_type = line[6:].strip()
                     elif line.startswith("data:"):
                         data = json.loads(line[5:].strip())
-                        if event_type == "text.delta" and isinstance(data.get("text"), str):
+                        if event_type == "text.delta" and isinstance(
+                            data.get("text"), str
+                        ):
                             yield {"type": "delta", "content": data["text"]}
                         elif event_type == "tool_call.delta":
                             index = int(data.get("index", 0))
-                            call = tool_calls.setdefault(index, {"id": data.get("call_id") or f"tool_{index}", "type": "function", "function": {"name": "", "arguments": ""}})
+                            call = tool_calls.setdefault(
+                                index,
+                                {
+                                    "id": data.get("call_id") or f"tool_{index}",
+                                    "type": "function",
+                                    "function": {"name": "", "arguments": ""},
+                                },
+                            )
                             if data.get("name"):
                                 call["function"]["name"] = data["name"]
                             if data.get("arguments"):
                                 call["function"]["arguments"] += data["arguments"]
-                        elif event_type == "usage" and isinstance(data.get("usage"), dict):
+                        elif event_type == "usage" and isinstance(
+                            data.get("usage"), dict
+                        ):
                             usage = data["usage"]
                         elif event_type == "response.failed":
-                            yield {"type": "error", "content": "Model Service stream failed"}
+                            yield {
+                                "type": "error",
+                                "content": "Model Service stream failed",
+                            }
                             return
                         elif event_type == "response.completed":
                             for call in tool_calls.values():
                                 yield {"type": "tool_call", "tool_call": call}
-                            yield {"type": "done", "content": "", "tool_calls": list(tool_calls.values()), "thinking": "", "usage": usage}
+                            yield {
+                                "type": "done",
+                                "content": "",
+                                "tool_calls": list(tool_calls.values()),
+                                "thinking": "",
+                                "usage": usage,
+                            }
                             return
         except (httpx.HTTPError, RuntimeError, ValueError) as exc:
             yield {"type": "error", "content": str(exc)}

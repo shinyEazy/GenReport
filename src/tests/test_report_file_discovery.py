@@ -60,23 +60,29 @@ class FakeAxiomDiscoveryModel:
                     },
                 },
             }
-            yield {"type": "done", "content": "", "tool_calls": [
-                {
-                    "id": "call-1",
-                    "type": "function",
-                    "function": {
-                        "name": "corpus_bm25_search",
-                        "arguments": '{"query":"revenue"}',
-                    },
-                }
-            ]}
+            yield {
+                "type": "done",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {
+                            "name": "corpus_bm25_search",
+                            "arguments": '{"query":"revenue"}',
+                        },
+                    }
+                ],
+            }
             return
         yield {"type": "delta", "content": '{"document_ids":["doc-1","doc-1"]}'}
         yield {"type": "done", "content": "", "tool_calls": []}
 
 
 class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
-    async def test_axiom_discovery_resolves_task_and_executes_retrieval_tool(self) -> None:
+    async def test_axiom_discovery_resolves_task_and_executes_retrieval_tool(
+        self,
+    ) -> None:
         model = FakeAxiomDiscoveryModel()
         agent = AxiomDiscoveryAgent(
             method_hub=FakeMethodHub(tools=[FakeDiscoveryTool()]),
@@ -93,10 +99,11 @@ class DiscoveryAgentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(selected, ["doc-1"])
         self.assertEqual(len(model.calls), 2)
         self.assertEqual(model.calls[0][1]["task_id"], "report.discover_sources")
+        self.assertEqual(model.calls[0][1]["response_format"], {"type": "json_object"})
         self.assertEqual(
-            model.calls[0][1]["response_format"], {"type": "json_object"}
+            model.calls[0][1]["tool_definitions"][0]["function"]["name"],
+            "corpus_bm25_search",
         )
-        self.assertEqual(model.calls[0][1]["tool_definitions"][0]["function"]["name"], "corpus_bm25_search")
 
     def test_openrouter_discovery_model_disables_reasoning(self) -> None:
         with patch("langchain_openai.ChatOpenAI") as chat_openai:
